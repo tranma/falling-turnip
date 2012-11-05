@@ -33,7 +33,7 @@ delta 0 n | n == 3    = 1
           | otherwise = 0
 
 tick :: Array D DIM2 Life -> Array U DIM2 Life
-tick a = R.suspendedComputeP $ R.zipWith delta a $ R.mapStencil2 (BoundConst 0) conwayStencil a
+tick a = R.suspendedComputeP $ R.szipWith delta a $ R.mapStencil2 (BoundConst 0) conwayStencil a
 
 resX = 640
 resY = 480
