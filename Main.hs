@@ -1,14 +1,7 @@
 {-# LANGUAGE QuasiQuotes, ScopedTypeVariables #-}
 
-import Data.Array.Repa (Z (..), (:.) (..), D, U, DIM2, Array, (!))
-import Data.Array.Repa.Repr.Cursored (C)
-import Data.Array.Repa.Stencil
-import Data.Array.Repa.Stencil.Dim2 
+import Data.Array.Repa (Z (..), (:.) (..), D, U, DIM2, Array)
 import qualified Data.Array.Repa                 as R
-import qualified Data.Array.Repa.Eval            as R
-import qualified Data.Array.Repa.Repr.Cursored   as R
-import qualified Data.Array.Repa.Stencil         as R
-import qualified Data.Array.Repa.Stencil.Dim2    as R
 
 import Graphics.Gloss              
 import Graphics.Gloss.Raster.Array 
@@ -18,9 +11,6 @@ import qualified Data.Vector.Unboxed             as V
 import qualified Data.Vector.Generic.Mutable     as V
 import Control.Monad
 import Data.List
-import Data.Word
-import Data.Bits
-import Data.Ix
 import System.Random
 
 import World

@@ -4,13 +4,9 @@ module Gravity
        (stepGravity)
 where
 
-import Data.Array.Repa (Z (..), (:.) (..), D, U, DIM2, Array, (!))
-import Data.Array.Repa.Repr.Cursored (C)
+import Data.Array.Repa (Z (..), (:.) (..), D, U, DIM2, Array)
 import Data.Array.Repa.Stencil
-import Data.Array.Repa.Stencil.Dim2 
 import qualified Data.Array.Repa                 as R
-import qualified Data.Array.Repa.Eval            as R
-import qualified Data.Array.Repa.Repr.Cursored   as R
 import qualified Data.Array.Repa.Stencil         as R
 import qualified Data.Array.Repa.Stencil.Dim2    as R
 
@@ -58,12 +54,6 @@ heavier x y = x < y
 movable :: Element -> Bool
 movable 100 = False
 movable _   = True
-
-{-# INLINE fluid #-}
-fluid :: Element -> Bool
-fluid 1 = True
-fluid _ = False
-
 
 {-# INLINE applyGravity #-}
 applyGravity :: (ExpandedEnv -> Cell) -> Env -> Cell 

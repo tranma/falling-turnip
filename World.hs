@@ -5,18 +5,9 @@ module World
        , render ) 
 where
 
-import Data.Array.Repa (Z (..), (:.) (..), D, U, DIM2, Array, (!))
-import Data.Array.Repa.Repr.Cursored (C)
-import Data.Array.Repa.Stencil
-import Data.Array.Repa.Stencil.Dim2 
+import Data.Array.Repa (D, U, DIM2, Array)
 import qualified Data.Array.Repa                 as R
-import qualified Data.Array.Repa.Eval            as R
-import qualified Data.Array.Repa.Repr.Cursored   as R
-import qualified Data.Array.Repa.Stencil         as R
-import qualified Data.Array.Repa.Stencil.Dim2    as R
-
 import Graphics.Gloss              
-
 import Data.Word
 
 
