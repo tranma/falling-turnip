@@ -21,18 +21,24 @@ main = playArrayIO
   (InWindow "Falling Turnip" (resX,resY) (pos, pos))
   (round factor, round factor)
   frameRate
-  (World { array = R.computeS $ R.fromFunction (Z :. resY :. resX) (const 0)
-         , currentElem = 0
+  (World { array = R.computeS $ R.fromFunction (Z :. resY :. resX) bareWorld
+         , currentElem     = 0
          , currGravityMask = margMaskEven
          , nextGravityMask = margMaskOdd
-         , mouseDown = False
-         , mousePos  = (0,0) 
-         , mousePrevPos = (0,0) }) 
-  (return     . render)
+         , mouseDown       = False
+         , mousePos        = (0,0) 
+         , mousePrevPos    = (0,0) }) 
+  ( return    . render)
   ((return .) . handleInput)
   stepWorld
   where frameRate = 30
-        pos = 300
+        pos       = 300
+        bareWorld = const 0
+        {-sampleWorld (Z:. y :. x)
+          | y == 5 = wall
+          | (x + y) `mod` 3 == 0 = sand
+          | (x - y) `mod` 2 == 0 = water
+          | otherwise = nothing-}
 
 
 handleInput :: Event -> World -> World
@@ -42,7 +48,8 @@ handleInput e w = handleInput' (w {mousePrevPos = mousePos w})
           EventKey (MouseButton LeftButton) Up _   (x,y) -> world { mouseDown = False, mousePos = (x/factor, y/factor) }
           EventKey (Char 'w') Down _ _ -> world { currentElem = water }
           EventKey (Char 's') Down _ _ -> world { currentElem = sand }
-          EventKey (Char 'b') Down _ _ -> world { currentElem = block }
+          EventKey (Char 't') Down _ _ -> world { currentElem = stone }
+          EventKey (Char 'a') Down _ _ -> world { currentElem = wall }
           EventMotion (x,y) -> world { mousePos = (x/factor, y/factor) }
           _ -> world
 
@@ -56,7 +63,7 @@ stepWorld time world
                                 $ drawLine (mousePrevPos world) (mousePos world) 
                                            (currentElem  world) (array    world)
                     else return $ stepGravity (currGravityMask world) $ array world
-      array' <- return $ R.computeS gravitised
+      array' <- R.computeP gravitised
       return $ world { array = array'
                      , currGravityMask = nextGravityMask world
                      , nextGravityMask = currGravityMask world } 
