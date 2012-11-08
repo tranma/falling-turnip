@@ -1,6 +1,6 @@
 {-# LANGUAGE QuasiQuotes, ScopedTypeVariables #-}
 
-import Data.Array.Repa (Z (..), (:.) (..), D, U, DIM2, Array)
+import Data.Array.Repa (Z (..), (:.) (..), U, DIM2, Array)
 import qualified Data.Array.Repa                 as R
 
 import Graphics.Gloss              
@@ -11,75 +11,77 @@ import qualified Data.Vector.Unboxed             as V
 import qualified Data.Vector.Generic.Mutable     as V
 import Control.Monad
 import Data.List
-import System.Random
 
 import World
 import Gravity
 
 
 main :: IO ()                     
-main = playArrayIO (InWindow "Falling Turnip" (resX,resY) (200,200))
-                   (1,1)
-                   60
-                   (World { array = R.computeS $ R.fromFunction (Z :. resY :. resX) (const 0)
-                          , currentElem = 0
-                          , gravityMode = True
-                          , mouseDown = False
-                          , mousePos  = (0,0) 
-                          , mousePrevPos = (0,0) }) 
-                   (return     . render)
-                   ((return .) . handleInput)
-                   stepWorld
+main = playArrayIO
+  (InWindow "Falling Turnip" (resX,resY) (pos, pos))
+  (round factor, round factor)
+  frameRate
+  (World { array = R.computeS $ R.fromFunction (Z :. resY :. resX) (const 0)
+         , currentElem = 0
+         , currGravityMask = margMaskEven
+         , nextGravityMask = margMaskOdd
+         , mouseDown = False
+         , mousePos  = (0,0) 
+         , mousePrevPos = (0,0) }) 
+  (return     . render)
+  ((return .) . handleInput)
+  stepWorld
+  where frameRate = 30
+        pos = 300
 
 
 handleInput :: Event -> World -> World
 handleInput e w = handleInput' (w {mousePrevPos = mousePos w})
   where handleInput' world = case e of
-          EventKey (MouseButton LeftButton) Down _ (x,y) -> world { mouseDown = True, mousePos = (x,y) }
-          EventKey (MouseButton LeftButton) Up _   (x,y) -> world { mouseDown = False, mousePos = (x,y) }
+          EventKey (MouseButton LeftButton) Down _ (x,y) -> world { mouseDown = True, mousePos = (x/factor, y/factor) }
+          EventKey (MouseButton LeftButton) Up _   (x,y) -> world { mouseDown = False, mousePos = (x/factor, y/factor) }
           EventKey (Char 'w') Down _ _ -> world { currentElem = water }
           EventKey (Char 's') Down _ _ -> world { currentElem = sand }
           EventKey (Char 'b') Down _ _ -> world { currentElem = block }
-          EventMotion (x,y) -> world { mousePos = (x,y) }
+          EventMotion (x,y) -> world { mousePos = (x/factor, y/factor) }
           _ -> world
 
 
 -- Updating (each frame) -------------------------------------------------------
 
-resX = 640
-resY = 480
-resWidth = resX `div` 2
-resHeight = resY `div` 2
-
-
 stepWorld :: Float -> World -> IO World
 stepWorld time world
- = do array' <- if mouseDown world 
-                then  stepGravity (gravityMode world) 
-                  =<< drawLine (mousePrevPos world) (mousePos world) 
-                               (currentElem world) (array world)
-                else  stepGravity (gravityMode world) 
-                   $  R.delay 
-                   $  array world
-      mode <- (randomIO :: IO Bool) 
-      return $ world { array = array', gravityMode = mode } 
+ = do gravitised <- if mouseDown world 
+                    then liftM   (stepGravity $ currGravityMask world)
+                                $ drawLine (mousePrevPos world) (mousePos world) 
+                                           (currentElem  world) (array    world)
+                    else return $ stepGravity (currGravityMask world) $ array world
+      array' <- return $ R.computeS gravitised
+      return $ world { array = array'
+                     , currGravityMask = nextGravityMask world
+                     , nextGravityMask = currGravityMask world } 
+
 
 -- | Draw a line onto the Repa array
 {-# INLINE drawLine #-}
-drawLine :: Coord -> Coord -> Cell -> Array U DIM2 Cell -> IO (Array D DIM2 Cell)
-drawLine (x0, y0) (x1, y1) new array
+drawLine :: GlossCoord -> GlossCoord -> Cell -> Array U DIM2 Cell -> IO (Array U DIM2 Cell)
+drawLine (xa, ya) (xb, yb) new array
   | sh@(Z :. _ :. width) <- R.extent array  
+  , (x0, y0, x1, y1)     <- ( round xa + resWidth, round ya + resHeight
+                            , round xb + resWidth, round yb + resHeight )
+  , x0 < resX, x1 < resX, y0 < resY, y1 < resY
   = let indices 
           = map (\(x,y) -> y * width + x) 
-          $ bresenham (round x0 + resWidth, round y0 + resHeight)
-                      (round x1 + resWidth, round y1 + resHeight)
+          $ bresenham (x0,y0) (x1,y1)
     in  do raw  <- V.unsafeThaw $ R.toUnboxed array
            forM_ indices $ \ix -> V.write raw ix new
            raw' <- V.unsafeFreeze raw
-           return $ R.delay $ R.fromUnboxed sh raw'
+           return $ R.fromUnboxed sh raw'
+  | otherwise = return array
 
 
 -- | Bresenham's line drawing algorithm, copypasted from Haskell wiki
+--   TODO rewrite to be more fficient
 {-# INLINE bresenham #-}
 bresenham :: (Int,Int) -> (Int,Int) -> [(Int,Int)]
 bresenham pa@(xa,ya) pb@(xb,yb) = map maySwitch . unfoldr go $ (x1,y1,0)
