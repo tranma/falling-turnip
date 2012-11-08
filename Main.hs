@@ -1,17 +1,22 @@
 {-# LANGUAGE QuasiQuotes, ScopedTypeVariables #-}
 
+-- Repa
 import Data.Array.Repa (Z (..), (:.) (..), U, DIM2, Array)
 import qualified Data.Array.Repa                 as R
 
+-- Gloss
 import Graphics.Gloss              
 import Graphics.Gloss.Raster.Array 
 import Graphics.Gloss.Interface.Pure.Game
 
-import qualified Data.Vector.Unboxed             as V
-import qualified Data.Vector.Generic.Mutable     as V
+-- base
 import Control.Monad
-import Data.List
+import Control.Monad.ST
+import qualified Data.STRef
+import qualified Data.Vector.Unboxed             as UV
+import qualified Data.Vector.Generic.Mutable     as MV
 
+-- friends
 import World
 import Gravity
 
@@ -77,34 +82,41 @@ drawLine (xa, ya) (xb, yb) new array
   , (x0, y0, x1, y1)     <- ( round xa + resWidth, round ya + resHeight
                             , round xb + resWidth, round yb + resHeight )
   , x0 < resX, x1 < resX, y0 < resY, y1 < resY
-  = let indices 
-          = map (\(x,y) -> y * width + x) 
-          $ bresenham (x0,y0) (x1,y1)
-    in  do raw  <- V.unsafeThaw $ R.toUnboxed array
-           forM_ indices $ \ix -> V.write raw ix new
-           raw' <- V.unsafeFreeze raw
-           return $ R.fromUnboxed sh raw'
+  = do raw  <- UV.unsafeThaw $ R.toUnboxed array
+       stToIO $ bresenham raw (\(x,y)-> y * width + x) new (x0, y0) (x1, y1)
+       raw' <- UV.unsafeFreeze raw
+       return $ R.fromUnboxed sh raw'
   | otherwise = return array
 
-
--- | Bresenham's line drawing algorithm, copypasted from Haskell wiki
---   TODO rewrite to be more fficient
-{-# INLINE bresenham #-}
-bresenham :: (Int,Int) -> (Int,Int) -> [(Int,Int)]
-bresenham pa@(xa,ya) pb@(xb,yb) = map maySwitch . unfoldr go $ (x1,y1,0)
-  where
-    steep = abs (yb - ya) > abs (xb - xa)
-    maySwitch = if steep then (\(x,y) -> (y,x)) else id
-    [(x1,y1),(x2,y2)] = sort [maySwitch pa, maySwitch pb]
-    deltax = x2 - x1
-    deltay = abs (y2 - y1)
-    ystep = if y1 < y2 then 1 else -1
-    go (xTemp, yTemp, error)
-        | xTemp > x2 = Nothing
-        | otherwise  = Just ((xTemp, yTemp), (xTemp + 1, newY, newError))
-        where
-          tempError = error + deltay
-          (newY, newError) = if (2*tempError) >= deltax
-                            then (yTemp+ystep,tempError-deltax)
-                            else (yTemp,tempError)
+-- Bresenham's line drawing, copypasted from
+-- http://rosettacode.org/wiki/Bitmap/Bresenham's_line_algorithm
+-- only destructively updating the array is fast enough
+{-# INLINE bresenham #-} 
+bresenham vec ix val (xa, ya) (xb, yb)
+  = do yV     <- var y1
+       errorV <- var $ deltax `div` 2
+       forM_ [x1 .. x2] (\x -> do
+        y <- get yV
+        MV.write vec (if steep then ix (y, x) else ix (x, y)) val        
+        mutate errorV $ subtract deltay
+        error <- get errorV
+        when (error < 0) (do
+            mutate yV (+ ystep)
+            mutate errorV (+ deltax)))
+    where steep = abs (yb - ya) > abs (xb - xa)
+          (xa', ya', xb', yb') 
+            = if steep 
+              then (ya, xa, yb, xb)
+              else (xa, ya, xb, yb)
+          (x1, y1, x2, y2)
+            = if xa' > xb' 
+              then (xb', yb', xa', ya')
+              else (xa', ya', xb', yb')
+          deltax = x2 - x1
+          deltay = abs $ y2 - y1
+          ystep  = if y1 < y2 then 1 else -1
+          var    = Data.STRef.newSTRef
+          get    = Data.STRef.readSTRef
+          mutate = Data.STRef.modifySTRef
+  
 
