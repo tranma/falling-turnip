@@ -1,4 +1,4 @@
-falling-turnip
+Falling Turnip
 ==============
 
-Cellular automata game using regular parallel arrays
+Falling sand game/cellular automata simulation with parallel arrays.
