@@ -16,7 +16,6 @@ import Data.Bits
 import World
 
 type Env       = Word32
-type Weight    = Word32
 type WeightEnv = Word32
 
 
@@ -25,10 +24,12 @@ stepGravity :: Array U DIM2 MargPos -> Array U DIM2 Cell -> Array D DIM2 Cell
 stepGravity mask array
   = let -- Repalce each cell with the collective value of all cells in its Margolus neighbourhood
         --    paired with the its position in the neighbourhood
-        envs       = R.mapStencil2 (BoundConst (0,0)) gravityStencil $ R.zip array mask
+        envs       = R.mapStencil2 (BoundFixed (nothing, 0)) gravityStencil $ R.zip array mask
         -- Apply gravity
      in R.zipWith mkCell envs $ R.map (gravityRules . weigh) envs              
-    where mkCell (env,_) pos = flip shiftR (8 * pos) $ env .&. margQuadrant pos
+    where mkCell (env,p) pos = let new = flip shiftR (8 * pos) $ env .&. margQuadrant pos
+                                   old = flip shiftR (8 * p) $ env .&. margQuadrant p
+                               in if (isWall new || isWall old) then old else new
           margQuadrant pos = shiftL 0xff (8 * pos)          
 
 -- | Position of cells in a block automaton
@@ -48,7 +49,7 @@ margMaskOdd = R.computeS $ R.map (flip subtract 3) margMaskEven
 --
 {-# INLINE gravityStencil #-}
 gravityStencil :: Stencil DIM2 (Env, MargPos)
-gravityStencil = StencilStatic (Z :. 3 :. 3) (0,-1) mkBlock
+gravityStencil = StencilStatic (Z :. 3 :. 3) (0, -1) mkBlock
   where mkBlock :: DIM2 -> (Element, MargPos) -> (Env, MargPos) -> (Env, MargPos)
         mkBlock (Z :.  1 :. -1) (n,0) (acc, p) = (acc .|. n, p)
         mkBlock (Z :.  1 :.  0) (n,0) (acc, p) = (acc .|. n, p)
@@ -67,9 +68,10 @@ gravityStencil = StencilStatic (Z :. 3 :. 3) (0,-1) mkBlock
         mkBlock (Z :. -1 :.  0) (n,3) (acc, p) = (acc .|. shiftL n 24, p)
         mkBlock (Z :. -1 :.  1) (n,3) (acc, p) = (acc .|. shiftL n 24, p)
         mkBlock _ _ acc = acc
+        --allNothing = nothing .|. shiftL nothing 8 .|. shiftL nothing 16 .|. shiftL nothing 24
 
 
-{-# INLINE weigh #-}
+--{-# INLINE weigh #-}
 weigh :: (Env, MargPos) -> WeightEnv
 weigh (env, pos)
   = let -- Break up the environment into its four components
@@ -79,15 +81,12 @@ weigh (env, pos)
         dr' = (flip shiftR 24 $ env .&. eight4)
         -- Determine the heaviest item in the environment
         heaviest = max (max ul' ur') (max dl' dr')
-        isFluid :: Cell -> Cell
-        isFluid 2 = 0x40 
-        isFluid _ = 0
         -- Compare each cell with the heaviest, lowest bit set if >=        
         ul, ur, dl, dr :: Weight
-        ul = (0x80 .&. (heaviest - 1 - ul')) .|. isFluid ul'
-        ur = (0x80 .&. (heaviest - 1 - ur')) .|. isFluid ur'
-        dl = (0x80 .&. (heaviest - 1 - dl')) .|. isFluid dl'
-        dr = (0x80 .&. (heaviest - 1 - dr')) .|. isFluid dr'
+        ul = (0x80 .&. (heaviest - 1 - weight ul')) .|. isFluid ul'
+        ur = (0x80 .&. (heaviest - 1 - weight ur')) .|. isFluid ur'
+        dl = (0x80 .&. (heaviest - 1 - weight dl')) .|. isFluid dl'
+        dr = (0x80 .&. (heaviest - 1 - weight dr')) .|. isFluid dr'
         -- Combine the lighter/heavier state of all 4 cells into an env
         --  32bits: | DR | DL | UR | UL |
         wenv = ul .|. (shiftL ur 8) .|. (shiftL dl 16) .|. (shiftL dr 24)
@@ -114,39 +113,39 @@ gravityRules wenv = case wenv of
   -- L ~ --> ~ L
   -- * *     * *
   0x808000C1 -> 1
-  0x808040C1 -> 1
   0x808001C0 -> 0
+  0x808040C1 -> 1
   0x808041C0 -> 0
   0x80C000C1 -> 1
-  0x80C040C1 -> 1
   0x80C001C0 -> 0
+  0x80C040C1 -> 1
   0x80C041C0 -> 0
   0xC08000C1 -> 1
-  0xC08040C1 -> 1
   0xC08001C0 -> 0
+  0xC08040C1 -> 1
   0xC08041C0 -> 0
   0xC0C000C1 -> 1
-  0xC0C040C1 -> 1
   0xC0C001C0 -> 0
-  0xC0C041C0 -> 0
+  0xC0C040C1 -> 1
+  0xC0C041C0 -> 0 
   -- ~ L --> L ~
   -- * *     * *
   0x8080C100 -> 0
-  0x8080C140 -> 0
   0x8080C001 -> 1
+  0x8080C140 -> 0
   0x8080C041 -> 1
   0x80C0C100 -> 0
-  0x80C0C140 -> 0
   0x80C0C001 -> 1
+  0x80C0C140 -> 0
   0x80C0C041 -> 1
   0xC080C100 -> 0
-  0xC080C140 -> 0
   0xC080C001 -> 1
+  0xC080C140 -> 0
   0xC080C041 -> 1
   0xC0C0C100 -> 0
-  0xC0C0C140 -> 0
   0xC0C0C001 -> 1
-  0xC0C0C041 -> 1
+  0xC0C0C140 -> 0
+  0xC0C0C041 -> 1 
   -- ~ ~ --> ~ ~
   -- L ~     ~ L
   0x00C10000 -> 3
@@ -170,20 +169,19 @@ gravityRules wenv = case wenv of
   0xC1000000 -> 2
   0xC0010000 -> 3
   0xC1400000 -> 2
-  0xC4010000 -> 3
+  0xC0410000 -> 3
   0xC1004000 -> 2
   0xC0014000 -> 3
   0xC1404000 -> 2
-  0xC4014000 -> 3
+  0xC0414000 -> 3
   0xC1000040 -> 2
   0xC0010040 -> 3
   0xC1400040 -> 2
-  0xC4010040 -> 3
+  0xC0410040 -> 3
   0xC1004040 -> 2
   0xC0014040 -> 3
   0xC1404040 -> 2
-  0xC4014040 -> 3
-
+  0xC0414040 -> 3
   _ -> case (wenv .&. 0x81818181) of
     -- * ~ --> ~ ~
     -- ~ ~     * ~

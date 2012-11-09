@@ -7,7 +7,6 @@ import qualified Data.Array.Repa                 as R
 -- Gloss
 import Graphics.Gloss              
 import Graphics.Gloss.Raster.Array 
-import Graphics.Gloss.Interface.Pure.Game
 
 -- base
 import Control.Monad
@@ -27,7 +26,7 @@ main = playArrayIO
   (round factor, round factor)
   frameRate
   (World { array = R.computeS $ R.fromFunction (Z :. resY :. resX) bareWorld
-         , currentElem     = 0
+         , currentElem     = nothing
          , currGravityMask = margMaskEven
          , nextGravityMask = margMaskOdd
          , mouseDown       = False
@@ -38,25 +37,12 @@ main = playArrayIO
   stepWorld
   where frameRate = 30
         pos       = 300
-        bareWorld = const 0
+        bareWorld = const nothing
         {-sampleWorld (Z:. y :. x)
           | y == 5 = wall
           | (x + y) `mod` 3 == 0 = sand
           | (x - y) `mod` 2 == 0 = water
           | otherwise = nothing-}
-
-
-handleInput :: Event -> World -> World
-handleInput e w = handleInput' (w {mousePrevPos = mousePos w})
-  where handleInput' world = case e of
-          EventKey (MouseButton LeftButton) Down _ (x,y) -> world { mouseDown = True, mousePos = (x/factor, y/factor) }
-          EventKey (MouseButton LeftButton) Up _   (x,y) -> world { mouseDown = False, mousePos = (x/factor, y/factor) }
-          EventKey (Char 'w') Down _ _ -> world { currentElem = water }
-          EventKey (Char 's') Down _ _ -> world { currentElem = sand }
-          EventKey (Char 't') Down _ _ -> world { currentElem = stone }
-          EventKey (Char 'a') Down _ _ -> world { currentElem = wall }
-          EventMotion (x,y) -> world { mousePos = (x/factor, y/factor) }
-          _ -> world
 
 
 -- Updating (each frame) -------------------------------------------------------
