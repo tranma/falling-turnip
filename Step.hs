@@ -28,19 +28,20 @@ step gen mask array
               $ R.mapStencil2 (BoundFixed (nothing, 0)) margStencil 
               $ R.zip array mask
     in  R.zipWith age randomish 
-      $ R.zipWith mkCell envs $ R.map (weigh) envs
+      $ R.zipWith mkCell envs 
+      $ R.map weigh envs
     where -- Swap cell at position 'p' in the margolus block 'env' with
           --    the cell at 'pos' in the same block
-          mkCell (env,p) pos 
-            = margQuadrant pos env
+          mkCell (env,_) pos = margQuadrant pos env
                
           
--- Mask to extract cell at quadrant 'pos'
+-- | Mask to extract cell at quadrant 'pos'
 {-# INLINE margQuadrant #-}
 margQuadrant :: MargPos -> Env -> Cell          
 margQuadrant pos = flip shiftR (8 * pos) . (.&. shiftL 0xff (8 * pos))
 
--- Break up the environment into its four components
+
+-- | Break up the environment into its four components
 {-# INLINE split #-}
 split :: Env -> (Cell, Cell, Cell, Cell)
 split env
@@ -55,57 +56,66 @@ split env
           eight3 = shiftL eight2 8
           eight4 = shiftL eight3 8
 
-
--- Combine the lighter/heavier state of all 4 cells into an env
---  32bits: | DR | DL | UR | UL |
--- {-# INLINE combine #-}
+-- | Combine the lighter/heavier state of all 4 cells into an env
+--     32bits: | DR | DL | UR | UL |
 combine :: (Cell, Cell, Cell, Cell) -> Env
 combine (ul, ur, dl, dr)
  = ul .|. (shiftL ur 8) .|. (shiftL dl 16) .|. (shiftL dr 24)
 
 
+-- | Apply gravity to the cell at quadrant 'pos' in 'env'
+--      returning the quadrant it should swap with
 weigh :: (Env, MargPos) -> MargPos
 weigh (env, pos)
-  = let (ul', ur', dl', dr') = split env        
-        -- Determine the heaviest item in the environment
+  = let current              = margQuadrant pos env
+        (ul', ur', dl', dr') = split env        
+
+        -- The heaviest item in the environment
         heaviest = max (max (weight ul') (weight ur'))
                        (max (weight dl') (weight dr'))
-        current = margQuadrant pos env
+
         -- Compare each cell with the heaviest, lowest bit set if >=        
         ul, ur, dl, dr :: Weight
         ul = (0x80 .&. (heaviest - 1 - weight ul')) .|. isFluid ul'
         ur = (0x80 .&. (heaviest - 1 - weight ur')) .|. isFluid ur'
         dl = (0x80 .&. (heaviest - 1 - weight dl')) .|. isFluid dl'
         dr = (0x80 .&. (heaviest - 1 - weight dr')) .|. isFluid dr'
-
-        combined = combine (ul, ur, dl, dr)
-        x' = applyGravity (combined .|. shiftL 1 (8 * pos))
-        -- Mark the current one and look it up
-        x = if isWall (margQuadrant x' env) then pos else x'
-        remainingWeights = filter (/= heaviest) [weight ul', weight ur', weight dl', weight dr']
-        nextheavy = maximum $ remainingWeights                        
-        ul2, ur2, dl2, dr2 :: Weight
-        ul2 = (0x80 .&. (nextheavy - 1 - weight ul')) .|. isFluid ul'
-        ur2 = (0x80 .&. (nextheavy - 1 - weight ur')) .|. isFluid ur'
-        dl2 = (0x80 .&. (nextheavy - 1 - weight dl')) .|. isFluid dl'
-        dr2 = (0x80 .&. (nextheavy - 1 - weight dr')) .|. isFluid dr'
-
+        weighed1 = combine (ul, ur, dl, dr)
         
+        -- Apply gravity with respect to the heaviest
+        x' = applyGravity (weighed1 .|. shiftL 1 (8 * pos))                
+        x  = if isWall (margQuadrant x' env) then pos else x'
 
-        y' = applyGravity (combine (ul2, ur2, dl2, dr2) .|. shiftL 1 (8 * pos))
+        -- The second heaviest item
+        remainingWeights 
+          = filter (/= heaviest)
+                   [weight ul', weight ur', weight dl', weight dr']
+        nextHeaviest = maximum $ remainingWeights 
 
-        y = if isWall (margQuadrant y' env) then pos else y'
-        ydest' = applyGravity (combined .|. shiftL 1 (8 * y))
+        -- Compare each cell with the second heaviest, lowest bit set if >=          
+        ul2, ur2, dl2, dr2 :: Weight
+        ul2 = (0x80 .&. (nextHeaviest - 1 - weight ul')) .|. isFluid ul'
+        ur2 = (0x80 .&. (nextHeaviest - 1 - weight ur')) .|. isFluid ur'
+        dl2 = (0x80 .&. (nextHeaviest - 1 - weight dl')) .|. isFluid dl'
+        dr2 = (0x80 .&. (nextHeaviest - 1 - weight dr')) .|. isFluid dr'
+        weighed2 = combine (ul2, ur2, dl2, dr2)
+
+        -- Apply gravity with respect to the second heaviest
+        y' = applyGravity (weighed2 .|. shiftL 1 (8 * pos))
+        y  = if isWall (margQuadrant y' env) then pos else y'
+
+        -- Compose the two gravity passes 
+        ydest' = applyGravity (weighed1 .|. shiftL 1 (8 * y))
         ydest = if isWall (margQuadrant ydest' env) then y else ydest'
-    in if (ul' == ur' && ur' == dl' && dl' == dr') then pos else 
-       if (isWall current) then pos else 
-       if x /= pos || (length remainingWeights <= 1) then x 
-       else if ydest == y then y else x
+
+    in if      (ul' == ur' && ur' == dl' && dl' == dr')   then pos 
+       else if (isWall current)                           then pos 
+       else if x /= pos || (length remainingWeights <= 1) then x 
+       else if ydest == y                                 then y
+       else x
       
         
-
-
-
+-- | Perform alchemy on a margolus block, with randomised probability of succeeding
 alchemy :: Int -> Env -> Env
 alchemy i env
  = let (ul0, ur0, dl0, dr0) = split env
@@ -114,7 +124,9 @@ alchemy i env
        (ur , dr2) = applyAlchemy i ur1 dr0
        (dr , dl3) = applyAlchemy i dr2 dl0
        (dl , ul ) = applyAlchemy i dl3 ul1
-   in  if (ul0 == ur0 && ur0 == dl0 && dl0 == dr0) then env else combine (ul, ur, dl, dr)
+   in  if (ul0 == ur0 && ur0 == dl0 && dl0 == dr0) 
+       then env 
+       else combine (ul, ur, dl, dr)
 
 
 -- Margolus block --------------------------------------------------------------

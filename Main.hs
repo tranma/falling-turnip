@@ -55,6 +55,7 @@ handleInput e w = handleInput' (w {mousePrevPos = mousePos w})
           EventKey (Char 'a') Down _ _ -> world { currentElem = wall        }
           EventKey (Char 'p') Down _ _ -> world { currentElem = plant       }
           EventKey (Char 'u') Down _ _ -> world { currentElem = spout       }
+          EventKey (Char 'm') Down _ _ -> world { currentElem = metal       }
           EventMotion (x,y) -> world { mousePos = (x/factor, y/factor) }
           _ -> world
 

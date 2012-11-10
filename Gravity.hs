@@ -5,6 +5,7 @@ where
 import Data.Bits
 import World
 
+-- Black magic for gravity
 -- Possible values:
 -- 
 --  L liquid      C0
