@@ -2,7 +2,7 @@ module World
        ( Element (..), Cell (..)
        , Env (..)
        , Weight (..), WeightEnv (..)
-       , nothing, neon, water, oil, sand, stone, wall
+       , nothing, steam_water, fire, oil, water, salt_water, sand, salt, stone, wall
        , isFluid, isWall
        , weight
 
@@ -40,16 +40,19 @@ data World = World { array        :: Array U DIM2 Cell
                    , nextGravityMask :: Array U DIM2 MargPos }
 
 
--- Gravity tricks require wall to be > 128
+--    match on direct values for efficiency!!!
 {-# INLINE nothing #-}
-nothing, neon, water, oil, sand, stone, wall :: Element
-nothing = 0
-neon    = 1
-water   = 5
-oil     = 3
-sand    = 6
-stone   = 7
-wall    = 100
+nothing, steam_water, fire, oil, water, salt_water, sand, salt, stone, wall :: Element
+nothing     = 0
+steam_water = 1
+fire        = 2
+oil         = 3
+water       = 5
+salt_water  = 6
+sand        = 7
+salt        = 8
+stone       = 9
+wall        = 100
 
 {-# INLINE isWall #-}
 isWall :: Element -> Bool
@@ -57,29 +60,32 @@ isWall x = x == wall
 
 {-# INLINE weight #-}
 weight :: Element -> Weight
-weight 0 = 1
-weight 1 = 0
+weight 0 = 2  -- nothing
+weight 1 = 0  -- steam water
+weight 2 = 0  -- fire
+weight 7 = 8  -- sand == salt
 weight x = fromIntegral x
-
 
 {-# INLINE isFluid #-}
 isFluid :: Element -> Element
---isFluid 0 = 0x40 
-isFluid 0 = 0 --0x40
-isFluid 3 = 0x40 
-isFluid 5 = 0x40 
+isFluid 0 = 0     -- nothing
+isFluid 3 = 0x40  -- oil
+isFluid 5 = 0x40  -- water
+isFluid 6 = 0x40  -- salt water
 isFluid _ = 0
 
-{-# INLINE render #-}
 render :: World -> Array D DIM2 Color
 render world = R.map color $ array world
-  where color 1   = light orange        
-        color 5   = bright $ bright $ light blue
-        color 3   = dark $ dark orange
-        color 6   = dim yellow
-        color 7   = greyN 0.7
-        color 100 = greyN 0.4
-        color 0   = black
+  where color 0   = black                                   -- nothing
+        color 1   = bright $ light $ light $ light blue     -- steam water   
+        color 2   = bright red                              -- fire   
+        color 3   = dark $ dim $ dim orange                 -- oil    
+        color 5   = bright $ bright $ light blue            -- water  
+        color 6   = bright $ bright $ light $ light blue    -- salt water
+        color 7   = dim yellow                              -- sand   
+        color 8   = greyN 0.95                              -- salt   
+        color 9   = greyN 0.7                               -- stone  
+        color 100 = greyN 0.4                               -- wall   
         color _   = error "render: element doesn't exist"
 
 resX, resY :: Int

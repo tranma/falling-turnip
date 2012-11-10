@@ -42,12 +42,15 @@ handleInput e w = handleInput' (w {mousePrevPos = mousePos w})
   where handleInput' world = case e of
           EventKey (MouseButton LeftButton) Down _ (x,y) -> world { mouseDown = True, mousePos = (x/factor, y/factor) }
           EventKey (MouseButton LeftButton) Up _   (x,y) -> world { mouseDown = False, mousePos = (x/factor, y/factor) }
-          EventKey (Char 'n') Down _ _ -> world { currentElem = neon  }
-          EventKey (Char 'w') Down _ _ -> world { currentElem = water }
-          EventKey (Char 'o') Down _ _ -> world { currentElem = oil   }
-          EventKey (Char 's') Down _ _ -> world { currentElem = sand  }
-          EventKey (Char 't') Down _ _ -> world { currentElem = stone }
-          EventKey (Char 'a') Down _ _ -> world { currentElem = wall  }
+          EventKey (Char 'e') Down _ _ -> world { currentElem = steam_water }
+          EventKey (Char 'f') Down _ _ -> world { currentElem = fire        }
+          EventKey (Char 'o') Down _ _ -> world { currentElem = oil         }
+          EventKey (Char 'w') Down _ _ -> world { currentElem = water       }
+          EventKey (Char 'l') Down _ _ -> world { currentElem = salt_water  }
+          EventKey (Char 's') Down _ _ -> world { currentElem = sand        }
+          EventKey (Char 'n') Down _ _ -> world { currentElem = salt        }
+          EventKey (Char 't') Down _ _ -> world { currentElem = stone       }
+          EventKey (Char 'a') Down _ _ -> world { currentElem = wall        }
           EventMotion (x,y) -> world { mousePos = (x/factor, y/factor) }
           _ -> world
 

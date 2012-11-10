@@ -12,25 +12,80 @@ import qualified Data.Array.Repa.Stencil.Dim2    as R
 
 -- base
 import Data.Bits
+import Control.Arrow
 
 -- friends
 import World
 import Gravity
+import Alchemy
 
 
-{-# INLINE step #-}
 step :: Array U DIM2 MargPos -> Array U DIM2 Cell -> Array D DIM2 Cell
 step mask array
-  = let -- Repalce each cell with the collective value of all cells in its Margolus neighbourhood
-        --    paired with the its position in the neighbourhood
-        envs       = R.mapStencil2 (BoundFixed (nothing, 0)) margStencil $ R.zip array mask
-        -- Apply gravity
-    in  R.zipWith mkCell envs $ R.map (gravityRules . weigh) envs              
-    where mkCell (env,p) pos 
+  = let envs  = R.map (first alchemy)
+              $ R.mapStencil2 (BoundFixed (nothing, 0)) margStencil $ R.zip array mask
+    in  R.zipWith mkCell envs $ R.map (applyGravity . weigh) envs
+    where -- Swap cell at position 'p' in the margolus block 'env' with
+          --    the cell at 'pos' in the same block
+          mkCell (env,p) pos 
             = let new = flip shiftR (8 * pos) $ env .&. margQuadrant pos
                   old = flip shiftR (8 * p)   $ env .&. margQuadrant p
               in if (isWall new || isWall old) then old else new
-          margQuadrant pos = shiftL 0xff (8 * pos)          
+          -- Mask to extract cell at quadrant 'pos'
+          margQuadrant pos = shiftL 0xff (8 * pos) 
+
+
+-- Break up the environment into its four components
+{-# INLINE split #-}
+split :: Env -> (Cell, Cell, Cell, Cell)
+split env
+ = let ul = (env .&. eight1)
+       ur = (flip shiftR 8 $ env .&. eight2)
+       dl = (flip shiftR 16 $ env .&. eight3)
+       dr = (flip shiftR 24 $ env .&. eight4)
+   in (ul, ur, dl, dr)
+    where -- Masks for extracting 8-bit slices
+          eight1 = 0xff
+          eight2 = shiftL eight1 8
+          eight3 = shiftL eight2 8
+          eight4 = shiftL eight3 8
+
+
+-- Combine the lighter/heavier state of all 4 cells into an env
+--  32bits: | DR | DL | UR | UL |
+{-# INLINE combine #-}
+combine :: (Cell, Cell, Cell, Cell) -> Env
+combine (ul, ur, dl, dr)
+ = ul .|. (shiftL ur 8) .|. (shiftL dl 16) .|. (shiftL dr 24)
+
+
+weigh :: (Env, MargPos) -> WeightEnv
+weigh (env, pos)
+  = let (ul', ur', dl', dr') = split env
+
+        -- Determine the heaviest item in the environment
+        heaviest = max (max ul' ur') (max dl' dr')
+        
+        -- Compare each cell with the heaviest, lowest bit set if >=        
+        ul, ur, dl, dr :: Weight
+        ul = (0x80 .&. (heaviest - 1 - weight ul')) .|. isFluid ul'
+        ur = (0x80 .&. (heaviest - 1 - weight ur')) .|. isFluid ur'
+        dl = (0x80 .&. (heaviest - 1 - weight dl')) .|. isFluid dl'
+        dr = (0x80 .&. (heaviest - 1 - weight dr')) .|. isFluid dr'
+
+        -- Mark the current one
+    in  combine (ul, ur, dl, dr) .|. shiftL 1 (8 * pos)
+
+
+alchemy :: Env -> Env
+alchemy env
+ = let (ul0, ur0, dl0, dr0) = split env
+       -- Apply interaction among the components
+       (ul1, ur1) = applyAlchemy ul0 ur0
+       (ur , dr2) = applyAlchemy ur1 dr0
+       (dr , dl3) = applyAlchemy dr2 dl0
+       (dl , ul ) = applyAlchemy dl3 ul1
+   in  combine (ul, ur, dl, dr)
 
 
 -- Margolus block --------------------------------------------------------------

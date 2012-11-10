@@ -1,37 +1,9 @@
-{-# LANGUAGE QuasiQuotes #-}
-
 module Gravity 
-      (weigh, gravityRules)
+      (applyGravity)
 where
 
 import Data.Bits
 import World
-
-{-# INLINE weigh #-}
-weigh :: (Env, MargPos) -> WeightEnv
-weigh (env, pos)
-  = let -- Break up the environment into its four components
-        ul' = (env .&. eight1)
-        ur' = (flip shiftR 8 $ env .&. eight2)
-        dl' = (flip shiftR 16 $ env .&. eight3)
-        dr' = (flip shiftR 24 $ env .&. eight4)
-        -- Determine the heaviest item in the environment
-        heaviest = max (max ul' ur') (max dl' dr')
-        -- Compare each cell with the heaviest, lowest bit set if >=        
-        ul, ur, dl, dr :: Weight
-        ul = (0x80 .&. (heaviest - 1 - weight ul')) .|. isFluid ul'
-        ur = (0x80 .&. (heaviest - 1 - weight ur')) .|. isFluid ur'
-        dl = (0x80 .&. (heaviest - 1 - weight dl')) .|. isFluid dl'
-        dr = (0x80 .&. (heaviest - 1 - weight dr')) .|. isFluid dr'
-        -- Combine the lighter/heavier state of all 4 cells into an env
-        --  32bits: | DR | DL | UR | UL |
-        wenv = ul .|. (shiftL ur 8) .|. (shiftL dl 16) .|. (shiftL dr 24)
-        -- Mark the current one
-    in wenv .|. shiftL 1 (8 * pos)
-    where eight1 = 0xff
-          eight2 = shiftL eight1 8
-          eight3 = shiftL eight2 8
-          eight4 = shiftL eight3 8
 
 -- Possible values:
 -- 
@@ -44,8 +16,20 @@ weigh (env, pos)
 --  * focused     81
 --  ~ non-focused 00
 --  ~ focused     01
-gravityRules :: WeightEnv -> MargPos
-gravityRules wenv = case wenv of 
+applyGravity :: WeightEnv -> MargPos
+applyGravity wenv = case wenv of 
+  -- L L --> ~ L
+  -- L ~     L L
+  0x01C0C0C0 -> 0
+  0x00C0C0C1 -> 3
+  0x41C0C0C0 -> 0
+  0x40C0C0C1 -> 3
+  -- L L --> L ~
+  -- ~ L     L L
+  0xC001C0C0 -> 1
+  0xC000C1C0 -> 2
+  0xC041C0C0 -> 1
+  0xC040C1C0 -> 2
   -- L ~ --> ~ L
   -- * *     * *
   0x808000C1 -> 1

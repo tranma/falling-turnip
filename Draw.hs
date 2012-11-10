@@ -17,7 +17,6 @@ import World
 
 
 -- | Draw a line onto the Repa array
-{-# INLINE drawLine #-}
 drawLine :: GlossCoord -> GlossCoord -> Cell -> Array U DIM2 Cell -> IO (Array U DIM2 Cell)
 drawLine (xa, ya) (xb, yb) new array
   | sh@(Z :. _ :. width) <- R.extent array  
@@ -33,7 +32,6 @@ drawLine (xa, ya) (xb, yb) new array
 -- Bresenham's line drawing, copypasted from
 -- http://rosettacode.org/wiki/Bitmap/Bresenham's_line_algorithm
 -- only destructively updating the array is fast enough
-{-# INLINE bresenham #-} 
 bresenham vec ix val (xa, ya) (xb, yb)
   = do yV     <- var y1
        errorV <- var $ deltax `div` 2
