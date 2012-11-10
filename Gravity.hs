@@ -18,18 +18,26 @@ import World
 --  ~ focused     01
 applyGravity :: WeightEnv -> MargPos
 applyGravity wenv = case wenv of 
-  -- L L --> ~ L
-  -- L ~     L L
-  0x01C0C0C0 -> 0
-  0x00C0C0C1 -> 3
-  0x41C0C0C0 -> 0
-  0x40C0C0C1 -> 3
-  -- L L --> L ~
-  -- ~ L     L L
-  0xC001C0C0 -> 1
-  0xC000C1C0 -> 2
-  0xC041C0C0 -> 1
-  0xC040C1C0 -> 2
+  -- L L --> L L
+  -- L ~     ~ L
+  0x01C0C0C0 -> 2
+  0x00C1C0C0 -> 3
+  0x41C0C0C0 -> 2
+  0x40C1C0C0 -> 3
+  0x40C0C1C0 -> 1
+  0x00C0C1C0 -> 1
+  0x40C0C0C1 -> 0
+  0x00C0C0C1 -> 0  
+  -- L L --> L L
+  -- ~ L     L ~
+  0xC001C0C0 -> 3
+  0xC100C0C0 -> 2
+  0xC041C0C0 -> 3
+  0xC140C0C0 -> 2
+  0xC040C1C0 -> 1
+  0xC000C1C0 -> 1
+  0xC040C0C1 -> 0
+  0xC000C0C1 -> 0 
   -- L ~ --> ~ L
   -- * *     * *
   0x808000C1 -> 1
@@ -101,7 +109,7 @@ applyGravity wenv = case wenv of
   0xC1004040 -> 2
   0xC0014040 -> 3
   0xC1404040 -> 2
-  0xC0414040 -> 3
+  0xC0414040 -> 3 
   _ -> case (wenv .&. 0x81818181) of
     -- * ~ --> ~ ~
     -- ~ ~     * ~

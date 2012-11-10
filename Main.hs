@@ -11,6 +11,7 @@ import Graphics.Gloss.Interface.Pure.Game
 
 -- base
 import Control.Monad
+import System.Random
 
 -- friends
 import World
@@ -32,7 +33,7 @@ main = playArrayIO
   ( return    . render)
   ((return .) . handleInput)
   stepWorld
-  where frameRate = 60
+  where frameRate = 30
         pos       = 300
         bareWorld = const nothing
 
@@ -50,19 +51,23 @@ handleInput e w = handleInput' (w {mousePrevPos = mousePos w})
           EventKey (Char 's') Down _ _ -> world { currentElem = sand        }
           EventKey (Char 'n') Down _ _ -> world { currentElem = salt        }
           EventKey (Char 't') Down _ _ -> world { currentElem = stone       }
+          EventKey (Char 'r') Down _ _ -> world { currentElem = torch       }
           EventKey (Char 'a') Down _ _ -> world { currentElem = wall        }
+          EventKey (Char 'p') Down _ _ -> world { currentElem = plant       }
+          EventKey (Char 'u') Down _ _ -> world { currentElem = spout       }
           EventMotion (x,y) -> world { mousePos = (x/factor, y/factor) }
           _ -> world
 
 
 stepWorld :: Float -> World -> IO World
 stepWorld time world
- = do gravitised <- if mouseDown world 
-                    then liftM   (step $ currGravityMask world)
-                                $ drawLine (mousePrevPos world) (mousePos world) 
-                                           (currentElem  world) (array    world)
-                    else return $ step (currGravityMask world) $ array world
-      array' <- R.computeP gravitised
+ = do int <- randomRIO (0,100)      
+      stepped <- if mouseDown world 
+                 then liftM   (step int $ currGravityMask world)
+                             $ drawLine (mousePrevPos world) (mousePos world) 
+                                        (currentElem  world) (array    world)
+                 else return $ step int (currGravityMask world) $ array world
+      array' <- R.computeP stepped
       return $ world { array = array'
                      , currGravityMask = nextGravityMask world
                      , nextGravityMask = currGravityMask world } 

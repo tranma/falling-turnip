@@ -1,6 +1,6 @@
 module Step
      ( step
-     , margMaskEven, margMaskOdd )
+     , margMaskEven, margMaskOdd, weigh, combine )
 where
 
 -- Repa
@@ -9,10 +9,11 @@ import Data.Array.Repa.Stencil
 import qualified Data.Array.Repa                 as R
 import qualified Data.Array.Repa.Repr.Unboxed    as R
 import qualified Data.Array.Repa.Stencil.Dim2    as R
-
+import Data.Array.Repa.Algorithms.Randomish      as R
 -- base
 import Data.Bits
 import Control.Arrow
+
 
 -- friends
 import World
@@ -20,20 +21,24 @@ import Gravity
 import Alchemy
 
 
-step :: Array U DIM2 MargPos -> Array U DIM2 Cell -> Array D DIM2 Cell
-step mask array
-  = let envs  = R.map (first alchemy)
-              $ R.mapStencil2 (BoundFixed (nothing, 0)) margStencil $ R.zip array mask
-    in  R.zipWith mkCell envs $ R.map (applyGravity . weigh) envs
+step :: Int -> Array U DIM2 MargPos -> Array U DIM2 Cell -> Array D DIM2 Cell
+step gen mask array
+  = let randomish = R.randomishIntArray (Z :. resY :. resX) 0 100 gen 
+        envs  = R.zipWith (\a (b,c) -> (alchemy a b, c)) randomish
+              $ R.mapStencil2 (BoundFixed (nothing, 0)) margStencil 
+              $ R.zip array mask
+    in  R.zipWith age randomish 
+      $ R.zipWith mkCell envs $ R.map (weigh) envs
     where -- Swap cell at position 'p' in the margolus block 'env' with
           --    the cell at 'pos' in the same block
           mkCell (env,p) pos 
-            = let new = flip shiftR (8 * pos) $ env .&. margQuadrant pos
-                  old = flip shiftR (8 * p)   $ env .&. margQuadrant p
-              in if (isWall new || isWall old) then old else new
-          -- Mask to extract cell at quadrant 'pos'
-          margQuadrant pos = shiftL 0xff (8 * pos) 
-
+            = margQuadrant pos env
+               
+          
+-- Mask to extract cell at quadrant 'pos'
+{-# INLINE margQuadrant #-}
+margQuadrant :: MargPos -> Env -> Cell          
+margQuadrant pos = flip shiftR (8 * pos) . (.&. shiftL 0xff (8 * pos))
 
 -- Break up the environment into its four components
 {-# INLINE split #-}
@@ -53,19 +58,19 @@ split env
 
 -- Combine the lighter/heavier state of all 4 cells into an env
 --  32bits: | DR | DL | UR | UL |
-{-# INLINE combine #-}
+-- {-# INLINE combine #-}
 combine :: (Cell, Cell, Cell, Cell) -> Env
 combine (ul, ur, dl, dr)
  = ul .|. (shiftL ur 8) .|. (shiftL dl 16) .|. (shiftL dr 24)
 
 
-weigh :: (Env, MargPos) -> WeightEnv
+weigh :: (Env, MargPos) -> MargPos
 weigh (env, pos)
-  = let (ul', ur', dl', dr') = split env
-
+  = let (ul', ur', dl', dr') = split env        
         -- Determine the heaviest item in the environment
-        heaviest = max (max ul' ur') (max dl' dr')
-        
+        heaviest = max (max (weight ul') (weight ur'))
+                       (max (weight dl') (weight dr'))
+        current = margQuadrant pos env
         -- Compare each cell with the heaviest, lowest bit set if >=        
         ul, ur, dl, dr :: Weight
         ul = (0x80 .&. (heaviest - 1 - weight ul')) .|. isFluid ul'
@@ -73,19 +78,43 @@ weigh (env, pos)
         dl = (0x80 .&. (heaviest - 1 - weight dl')) .|. isFluid dl'
         dr = (0x80 .&. (heaviest - 1 - weight dr')) .|. isFluid dr'
 
-        -- Mark the current one
-    in  combine (ul, ur, dl, dr) .|. shiftL 1 (8 * pos)
+        combined = combine (ul, ur, dl, dr)
+        x' = applyGravity (combined .|. shiftL 1 (8 * pos))
+        -- Mark the current one and look it up
+        x = if isWall (margQuadrant x' env) then pos else x'
+        remainingWeights = filter (/= heaviest) [weight ul', weight ur', weight dl', weight dr']
+        nextheavy = maximum $ remainingWeights                        
+        ul2, ur2, dl2, dr2 :: Weight
+        ul2 = (0x80 .&. (nextheavy - 1 - weight ul')) .|. isFluid ul'
+        ur2 = (0x80 .&. (nextheavy - 1 - weight ur')) .|. isFluid ur'
+        dl2 = (0x80 .&. (nextheavy - 1 - weight dl')) .|. isFluid dl'
+        dr2 = (0x80 .&. (nextheavy - 1 - weight dr')) .|. isFluid dr'
+
+        
+
+        y' = applyGravity (combine (ul2, ur2, dl2, dr2) .|. shiftL 1 (8 * pos))
+
+        y = if isWall (margQuadrant y' env) then pos else y'
+        ydest' = applyGravity (combined .|. shiftL 1 (8 * y))
+        ydest = if isWall (margQuadrant ydest' env) then y else ydest'
+    in if (ul' == ur' && ur' == dl' && dl' == dr') then pos else 
+       if (isWall current) then pos else 
+       if x /= pos || (length remainingWeights <= 1) then x 
+       else if ydest == y then y else x
+      
+        
 
 
-alchemy :: Env -> Env
-alchemy env
+
+alchemy :: Int -> Env -> Env
+alchemy i env
  = let (ul0, ur0, dl0, dr0) = split env
        -- Apply interaction among the components
-       (ul1, ur1) = applyAlchemy ul0 ur0
-       (ur , dr2) = applyAlchemy ur1 dr0
-       (dr , dl3) = applyAlchemy dr2 dl0
-       (dl , ul ) = applyAlchemy dl3 ul1
-   in  combine (ul, ur, dl, dr)
+       (ul1, ur1) = applyAlchemy i ul0 ur0
+       (ur , dr2) = applyAlchemy i ur1 dr0
+       (dr , dl3) = applyAlchemy i dr2 dl0
+       (dl , ul ) = applyAlchemy i dl3 ul1
+   in  if (ul0 == ur0 && ur0 == dl0 && dl0 == dr0) then env else combine (ul, ur, dl, dr)
 
 
 -- Margolus block --------------------------------------------------------------
