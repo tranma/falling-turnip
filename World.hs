@@ -4,7 +4,7 @@ module World
        , Env (..)
        , Weight (..), WeightEnv (..)
        
-       , nothing, steam_water, steam_condensed, fire, fire_end, oil
+       , nothing, turnip, steam_water, steam_condensed, fire, fire_end, oil
        , water, salt_water, sand, salt, stone, torch, plant, spout, metal, wall, lava
 
        , isFluid, isWall, isFire  
@@ -56,7 +56,6 @@ data World = World { array        :: Array U DIM2 Cell
 
 {-# INLINE nothing #-}
 -- Must match on direct values for efficiency
-nothing, steam_water, steam_condensed, fire, fire_end, oil, water, salt_water, sand, salt, stone, torch, plant, spout, metal, wall :: Element
 nothing         = 0
 steam_water     = 1
 steam_condensed = 2
@@ -76,6 +75,24 @@ lava            = 27
 turnip          = 126
 wall            = 127
 
+elems :: [Element]
+elems = [ nothing        
+        , steam_water    
+        , steam_condensed
+        , oil            
+        , water          
+        , salt_water     
+        , sand           
+        , salt           
+        , stone          
+        , fire           
+        , fire_end       
+        , torch          
+        , plant          
+        , spout          
+        , metal          
+        , lava           
+        , turnip ] 
 
 {-# INLINE isWall #-}
 isWall :: Element -> Bool
@@ -113,15 +130,15 @@ weight x | isFire x  = 0
 
 {-# INLINE age #-}
 age :: Int -> Element -> Element
-age gen x 
+age r x 
   -- fire eventually goes out
   | x == fire_end = nothing
-  | isFire x      = if gen < 50 then x + 1 else x
+  | isFire x      = if r < 50 then x + 1 else x
   -- steam eventually condenses
-  | x == steam_water     = if gen < 1 then water else steam_water
-  | x == steam_condensed = if gen < 5 then water else steam_condensed
+  | x == steam_water     = if r < 1 then water else steam_water
+  | x == steam_condensed = if r < 5 then water else steam_condensed
   -- turnip being turnip
-  | x == turnip = x
+  | x == turnip   = elems !! ((r * length elems) `div` 110)
   | otherwise     = x
 
 
@@ -184,7 +201,7 @@ buttons = R.fromList (Z :. buttonH + paddingH :. resX)
             in  side ++ (concat $ intersperse gap $ oneBox' col : map oneBox selectableElems) ++ side
 
 selectableElems :: [Element]
-selectableElems = [ wall, nothing
+selectableElems = [ wall, nothing, turnip
                   , oil, water, sand, salt, stone
                   , torch, plant, spout, metal, lava ]
 
@@ -224,15 +241,16 @@ elemOf ((subtract 5) . (+ resWidth) . round -> x, _)
   | x < buttonW               = fire
   | x <      gapSize + 2  * buttonW = wall
   | x < 2  * gapSize + 3  * buttonW = nothing
-  | x < 3  * gapSize + 4  * buttonW = oil
-  | x < 4  * gapSize + 5  * buttonW = water
-  | x < 5  * gapSize + 6  * buttonW = sand
-  | x < 6  * gapSize + 7  * buttonW = salt
-  | x < 7  * gapSize + 8  * buttonW = stone
-  | x < 8  * gapSize + 9  * buttonW = torch
-  | x < 9  * gapSize + 10 * buttonW = plant
-  | x < 10 * gapSize + 11 * buttonW = spout 
-  | x < 11 * gapSize + 12 * buttonW = metal
+  | x < 3  * gapSize + 4  * buttonW = turnip
+  | x < 4  * gapSize + 5  * buttonW = oil
+  | x < 5  * gapSize + 6  * buttonW = water
+  | x < 6  * gapSize + 7  * buttonW = sand
+  | x < 7  * gapSize + 8  * buttonW = salt
+  | x < 8  * gapSize + 9  * buttonW = stone
+  | x < 9  * gapSize + 10 * buttonW = torch
+  | x < 10 * gapSize + 11 * buttonW = plant 
+  | x < 11 * gapSize + 12 * buttonW = spout
+  | x < 12 * gapSize + 13 * buttonW = metal
   | otherwise                       = lava  
 
 tooltipFiles =[(fire    , "tooltips/fire.png"),
@@ -247,4 +265,5 @@ tooltipFiles =[(fire    , "tooltips/fire.png"),
                (plant   , "tooltips/plant.png"),
                (spout   , "tooltips/spout.png"),
                (metal   , "tooltips/metal.png"),
-               (lava    , "tooltips/lava.png")]
+               (lava    , "tooltips/lava.png"),
+               (turnip  , "tooltips/turnip.png")]
