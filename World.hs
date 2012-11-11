@@ -75,6 +75,7 @@ lava            = 27
 turnip          = 126
 wall            = 127
 
+{-# INLINE elems #-}
 elems :: [Element]
 elems = [ nothing        
         , steam_water    
@@ -143,16 +144,18 @@ age r x
 
 
 -- Drawing ---------------------------------------------------------------------
-
+{-# INLINE render #-}
 render :: World -> Array D DIM2 Color
 render world 
   = R.transpose $ (R.transpose $ tooltipLeft world R.++ R.map (dim . dim) (tooltipRight world)) 
              R.++ (R.transpose buttons)
              R.++ (R.transpose $ R.map colour $ array world) 
              
+{-# INLINE brown #-}
 brown :: Color
 brown = makeColor (129/255) (49/255) (29/255) 1
 
+{-# INLINE colour #-}
 colour :: Element -> Color
 colour 0   = black                                   -- nothing
 colour 1   = bright $ light $ light $ light blue     -- steam           
@@ -177,6 +180,7 @@ colour x                                             -- fire
   | otherwise = error "render: element doesn't exist"
 
 
+{-# INLINE buttons #-}
 buttons :: Array V DIM2 Color
 buttons = R.fromList (Z :. buttonH + paddingH :. resX) 
         $  hPadding  ++ hPadding2
@@ -201,7 +205,16 @@ buttons = R.fromList (Z :. buttonH + paddingH :. resX)
                                 red yellow
             in  side ++ (concat $ intersperse gap $ oneBox' col : map oneBox selectableElems) ++ side
 
-
+{-# INLINE resX #-}
+{-# INLINE resY #-}
+{-# INLINE resWidth #-}
+{-# INLINE resHeight #-}
+{-# INLINE paddingH #-}
+{-# INLINE tooltipH #-}
+{-# INLINE gapSize #-}
+{-# INLINE sideSize #-}
+{-# INLINE buttonW #-}
+{-# INLINE buttonH #-}
 resX, resY, resWidth, resHeight, paddingH, tooltipH, gapSize, sideSize, buttonW, buttonH :: Int
 -- size of the world
 resX      = 320
@@ -225,18 +238,22 @@ buttonW
     in  (resX - (n-1)*gapSize) `div` n
 buttonH   = 15
 
-
+{-# INLINE factor #-}
+{-# INLINE palletteH #-}
 factor, palletteH :: Float
 factor = 2
 palletteH = (fromIntegral buttonH + fromIntegral paddingH + fromIntegral tooltipH)/2
 
+{-# INLINE outOfWorld #-}
 outOfWorld :: GlossCoord -> Bool
 outOfWorld (_, y) = round y + resHeight < 0
 
+{-# INLINE selectableElems #-}
 selectableElems :: [Element]
 selectableElems
  = [ torch, water, spout, plant, stone, metal, lava, oil, salt, sand, nothing, wall, turnip ]
 
+{-# INLINE elemOf #-}
 elemOf :: GlossCoord -> Element
 elemOf ((subtract 5) . (+ resWidth) . round -> x, _)
   | x < buttonW                     = fire
@@ -254,6 +271,7 @@ elemOf ((subtract 5) . (+ resWidth) . round -> x, _)
   | x < 12 * gapSize + 13 * buttonW = wall
   | otherwise                       = turnip
 
+{-# INLINE tooltipFiles #-}
 tooltipFiles =[(fire    , "tooltips/fire.png"),
                (wall    , "tooltips/wall.png"),
                (nothing , "tooltips/erase.png"),

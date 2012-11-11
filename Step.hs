@@ -20,7 +20,7 @@ import World
 import Gravity
 import Alchemy
 
-
+{-# INLINE step #-}
 step :: Int -> Array U DIM2 MargPos -> Array U DIM2 Cell -> Array D DIM2 Cell
 step gen mask array
   = let randomish = R.randomishIntArray (Z :. resY :. resX) 0 100 gen 
@@ -58,6 +58,7 @@ split env
 
 -- | Combine the lighter/heavier state of all 4 cells into an env
 --     32bits: | DR | DL | UR | UL |
+{-# INLINE combine #-}
 combine :: (Cell, Cell, Cell, Cell) -> Env
 combine (ul, ur, dl, dr)
  = ul .|. (shiftL ur 8) .|. (shiftL dl 16) .|. (shiftL dr 24)
@@ -65,6 +66,7 @@ combine (ul, ur, dl, dr)
 
 -- | Apply gravity to the cell at quadrant 'pos' in 'env'
 --      returning the quadrant it should swap with
+{-# INLINE weigh #-}
 weigh :: (Env, MargPos) -> MargPos
 weigh (env, pos)
   = let current              = margQuadrant pos env
@@ -116,6 +118,7 @@ weigh (env, pos)
       
         
 -- | Perform alchemy on a margolus block, with randomised probability of succeeding
+{-# INLINE alchemy #-}
 alchemy :: Int -> Env -> Env
 alchemy i env
  = let (ul0, ur0, dl0, dr0) = split env
@@ -135,11 +138,13 @@ alchemy i env
 --   0 1 0 1 ....
 --   2 3 2 3 ....
 --   ...
+{-# INLINE margMaskEven #-}
 margMaskEven :: Array U DIM2 MargPos
 margMaskEven
   = R.computeS $ R.fromFunction (Z:. resY :. resX)
                $ \(Z:. y :. x) -> x `mod` 2 .|. shiftL (y `mod` 2) 1
 
+{-# INLINE margMaskOdd #-}
 margMaskOdd :: Array U DIM2 MargPos
 margMaskOdd = R.computeS $ R.map (flip subtract 3) margMaskEven
 

@@ -2,14 +2,12 @@ PROGNAME=turnip
 
 GHC_OPTS := \
 	-threaded \
-	-O2 \
+	-O3 \
 	-Odph \
 	-rtsopts \
 	-fno-liberate-case \
-#	-funfolding-use-threshold1000 \
-#	-funfolding-keeness-factor1000 \
-	-funfolding-use-threshold500 \
-	-funfolding-keeness-factor500 \
+	-funfolding-use-threshold1000 \
+	-funfolding-keeness-factor1000 \
 	-fllvm \
 	-optlo-O3
 
