@@ -19,7 +19,7 @@ where
 
 import Graphics.Gloss    
 import Data.Word
-import Data.Array.Repa (Z (..), (:.) (..), D, U, DIM2, Array)
+import Data.Array.Repa (Z (..), (:.) (..), D, U, DIM2)
 import Data.Array.Repa.Repr.Vector
 import qualified Data.Array.Repa.Eval   as R
 import qualified Data.Array.Repa        as R
@@ -75,6 +75,7 @@ lava            = 27
 turnip          = 126
 wall            = 127
 
+{-# INLINE elems #-}
 elems :: [Element]
 elems = [ nothing        
         , steam_water    
@@ -143,16 +144,19 @@ age r x
 
 
 -- Drawing ---------------------------------------------------------------------
-
+{-# INLINE render #-}
 render :: World -> Array D DIM2 Color
 render world 
   = R.transpose $ (R.transpose $ tooltipLeft world R.++ R.map (dim . dim) (tooltipRight world)) 
              R.++ (R.transpose buttons)
              R.++ (R.transpose $ R.map colour $ array world) 
              
+
+{-# INLINE brown #-}
 brown :: Color
 brown = makeColor (129/255) (49/255) (29/255) 1
 
+{-# INLINE colour #-}
 colour :: Element -> Color
 colour 0   = black                                   -- nothing
 colour 1   = bright $ light $ light $ light blue     -- steam           
@@ -177,6 +181,7 @@ colour x                                             -- fire
   | otherwise = error "render: element doesn't exist"
 
 
+{-# INLINE buttons #-}
 buttons :: Array V DIM2 Color
 buttons = R.fromList (Z :. buttonH + paddingH :. resX) 
         $  hPadding  ++ hPadding2
@@ -202,6 +207,40 @@ buttons = R.fromList (Z :. buttonH + paddingH :. resX)
             in  side ++ (concat $ intersperse gap $ oneBox' col : map oneBox selectableElems) ++ side
 
 
+{-# INLINE selectableElems #-}
+selectableElems :: [Element]
+selectableElems
+ = [ torch, water, spout, plant, stone, metal, lava, oil, salt, sand, nothing, wall, turnip ]
+
+{-# INLINE elemOf #-}
+elemOf :: GlossCoord -> Element
+elemOf ((subtract 5) . (+ resWidth) . round -> x, _)
+  | x < buttonW                     = fire
+  | x <      gapSize + 2  * buttonW = torch
+  | x < 2  * gapSize + 3  * buttonW = water
+  | x < 3  * gapSize + 4  * buttonW = spout
+  | x < 4  * gapSize + 5  * buttonW = plant
+  | x < 5  * gapSize + 6  * buttonW = stone
+  | x < 6  * gapSize + 7  * buttonW = metal
+  | x < 7  * gapSize + 8  * buttonW = lava
+  | x < 8  * gapSize + 9  * buttonW = oil
+  | x < 9  * gapSize + 10 * buttonW = salt
+  | x < 10 * gapSize + 11 * buttonW = sand
+  | x < 11 * gapSize + 12 * buttonW = nothing
+  | x < 12 * gapSize + 13 * buttonW = wall
+  | otherwise                       = turnip
+
+
+{-# INLINE resX #-}
+{-# INLINE resY #-}
+{-# INLINE resWidth #-}
+{-# INLINE resHeight #-}
+{-# INLINE paddingH #-}
+{-# INLINE tooltipH #-}
+{-# INLINE gapSize #-}
+{-# INLINE sideSize #-}
+{-# INLINE buttonW #-}
+{-# INLINE buttonH #-}
 resX, resY, resWidth, resHeight, paddingH, tooltipH, gapSize, sideSize, buttonW, buttonH :: Int
 -- size of the world
 resX      = 320
@@ -225,35 +264,17 @@ buttonW
     in  (resX - (n-1)*gapSize) `div` n
 buttonH   = 15
 
-
+{-# INLINE factor #-}
+{-# INLINE palletteH #-}
 factor, palletteH :: Float
 factor = 2
 palletteH = (fromIntegral buttonH + fromIntegral paddingH + fromIntegral tooltipH)/2
 
+{-# INLINE outOfWorld #-}
 outOfWorld :: GlossCoord -> Bool
 outOfWorld (_, y) = round y + resHeight < 0
 
-selectableElems :: [Element]
-selectableElems
- = [ torch, water, spout, plant, stone, metal, lava, oil, salt, sand, nothing, wall, turnip ]
-
-elemOf :: GlossCoord -> Element
-elemOf ((subtract 5) . (+ resWidth) . round -> x, _)
-  | x < buttonW                     = fire
-  | x <      gapSize + 2  * buttonW = torch
-  | x < 2  * gapSize + 3  * buttonW = water
-  | x < 3  * gapSize + 4  * buttonW = spout
-  | x < 4  * gapSize + 5  * buttonW = plant
-  | x < 5  * gapSize + 6  * buttonW = stone
-  | x < 6  * gapSize + 7  * buttonW = metal
-  | x < 7  * gapSize + 8  * buttonW = lava
-  | x < 8  * gapSize + 9  * buttonW = oil
-  | x < 9  * gapSize + 10 * buttonW = salt
-  | x < 10 * gapSize + 11 * buttonW = sand
-  | x < 11 * gapSize + 12 * buttonW = nothing
-  | x < 12 * gapSize + 13 * buttonW = wall
-  | otherwise                       = turnip
-
+{-# INLINE tooltipFiles #-}
 tooltipFiles =[(fire    , "tooltips/fire.png"),
                (wall    , "tooltips/wall.png"),
                (nothing , "tooltips/erase.png"),
