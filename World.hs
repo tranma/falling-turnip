@@ -72,6 +72,7 @@ torch           = 23
 plant           = 24
 spout           = 25
 metal           = 26
+lava            = 27
 wall            = 100
 
 
@@ -90,20 +91,22 @@ isFire x = x >= fire && x <= fire_end
 
 {-# INLINE isFluid #-}
 isFluid :: Element -> Element
-isFluid 0 = 0     -- nothing
-isFluid 1 = 0x40  -- steam
-isFluid 2 = 0x40 
-isFluid 6 = 0x40  -- oil
-isFluid 7 = 0x40  -- water
-isFluid 8 = 0x40  -- salt water
-isFluid _ = 0
+isFluid 0  = 0     -- nothing
+isFluid 1  = 0x40  -- steam
+isFluid 2  = 0x40 
+isFluid 6  = 0x40  -- oil
+isFluid 7  = 0x40  -- water
+isFluid 8  = 0x40  -- salt water
+isFluid 27 = 0x40  -- lav
+isFluid _  = 0
 
 {-# INLINE weight #-}
 weight :: Element -> Weight
-weight 0  = 2    -- nothing
-weight 1  = 0    -- steam water
-weight 2  = 0    -- steam water
-weight 10 = 11   -- sand == salt
+weight 0  = 2      -- nothing
+weight 1  = 0      -- steam water
+weight 2  = 0      -- steam water
+weight 10 = salt   -- sand == salt
+weight 27 = stone  -- lava == stone
 weight x | isFire x  = 0
          | otherwise = fromIntegral x
 
@@ -142,6 +145,7 @@ colour 23  = bright $ orange                         -- torch
 colour 24  = dim $ green                             -- plant
 colour 25  = blue                                    -- spout
 colour 26  = mixColors (0.2) (0.8) blue (greyN 0.5)  -- metal
+colour 27  = bright red                              -- lava
 colour x                                             -- fire
   | isFire x  = mixColors (1.0 * fromIntegral (x - fire)) 
                           (1.0 * fromIntegral (fire_end - x)) 
@@ -150,38 +154,61 @@ colour x                                             -- fire
 
 
 buttons :: Array V DIM2 Color
-buttons = R.fromList (Z :. buttonH + 4 :. resX) 
+buttons = R.fromList (Z :. buttonH + paddingH :. resX) 
         $  hPadding  ++ hPadding2
        ++ (concat $ map oneLine [1..buttonH])
        ++  hPadding2 ++ hPadding
-  where bgUI      = black
-        gap       = replicate 2 bgUI        
-        side      = replicate 5 bgUI
+  where -- background
+        bgUI      = black
+        -- gap between buttons
+        gap       = replicate gapSize bgUI        
+        -- gap from left and right edges of the window
+        side      = replicate sideSize bgUI
+        -- gap from top and bottom of the palette
         hPadding  = replicate resX white
         hPadding2 = replicate resX bgUI
+        -- one button
         oneBox e  = oneBox' $ colour e
         oneBox' c = replicate buttonW c
-        oneLine x = let col = mixColors (fromIntegral x / fromIntegral buttonH) 
-                                        (1.0 - fromIntegral x / fromIntegral buttonH)
-                                        red yellow
-                    in  side ++ (concat $ intersperse gap $ oneBox' col : map oneBox elems) ++ side
-        elems = [ wall, nothing, oil
-                , water, sand, salt, stone
-                , torch, plant, spout, metal ]
+        -- one line = fire + rest of elements
+        oneLine x 
+          = let col = mixColors (fromIntegral x / fromIntegral buttonH) 
+                                (1.0 - fromIntegral x / fromIntegral buttonH)
+                                red yellow
+            in  side ++ (concat $ intersperse gap $ oneBox' col : map oneBox selectableElems) ++ side
 
-resX, resY, buttonW, buttonH :: Int
+selectableElems :: [Element]
+selectableElems = [ wall, nothing
+                  , oil, water, sand, salt, stone
+                  , torch, plant, spout, metal, lava ]
+
+resX, resY, resWidth, resHeight, paddingH, tooltipH, gapSize, sideSize, buttonW, buttonH :: Int
+-- size of the world
 resX      = 320
 resY      = 240
+-- size of window = size of world + size of palette + size of tooltip area
 winX      = resX
-winY      = resY + buttonH + 4 + 15
+winY      = resY + buttonH + paddingH + tooltipH
+-- gloss origin is at center, while repa origin is bottom left, so shifting needed
 resWidth  = resX `div` 2
 resHeight = resY `div` 2
-buttonW = 24
-buttonH = 15
+-- 2 (top & bottom) * number of hPadding's
+paddingH  = 4
+-- size of buttons, tooltips and gaps
+tooltipH  = 15
+gapSize   = 2  
+sideSize 
+  = let n = 1 + length selectableElems
+    in  (resX - n * buttonW - (n - 1) * gapSize) `div` 2
+buttonW 
+  = let n = 1 + length selectableElems
+    in  (resX - (n-1)*gapSize) `div` n
+buttonH   = 15
+
 
 factor, palletteH :: Float
 factor = 2
-palletteH = (fromIntegral buttonH + 4 + 15)/2
+palletteH = (fromIntegral buttonH + fromIntegral paddingH + fromIntegral tooltipH)/2
 
 outOfWorld :: GlossCoord -> Bool
 outOfWorld (_, y) = round y + resHeight < 0
@@ -189,17 +216,18 @@ outOfWorld (_, y) = round y + resHeight < 0
 elemOf :: GlossCoord -> Element
 elemOf ((subtract 5) . (+ resWidth) . round -> x, _)
   | x < buttonW               = fire
-  | x <      2 + 2  * buttonW = wall
-  | x < 2  * 2 + 3  * buttonW = nothing
-  | x < 3  * 2 + 4  * buttonW = oil
-  | x < 4  * 2 + 5  * buttonW = water
-  | x < 5  * 2 + 6  * buttonW = sand
-  | x < 6  * 2 + 7  * buttonW = salt
-  | x < 7  * 2 + 8  * buttonW = stone
-  | x < 8  * 2 + 9  * buttonW = torch
-  | x < 9  * 2 + 10 * buttonW = plant
-  | x < 10 * 2 + 11 * buttonW = spout 
-  | otherwise                 = metal  
+  | x <      gapSize + 2  * buttonW = wall
+  | x < 2  * gapSize + 3  * buttonW = nothing
+  | x < 3  * gapSize + 4  * buttonW = oil
+  | x < 4  * gapSize + 5  * buttonW = water
+  | x < 5  * gapSize + 6  * buttonW = sand
+  | x < 6  * gapSize + 7  * buttonW = salt
+  | x < 7  * gapSize + 8  * buttonW = stone
+  | x < 8  * gapSize + 9  * buttonW = torch
+  | x < 9  * gapSize + 10 * buttonW = plant
+  | x < 10 * gapSize + 11 * buttonW = spout 
+  | x < 11 * gapSize + 12 * buttonW = metal
+  | otherwise                       = lava  
 
 tooltipFiles =[(fire    , "tooltips/fire.png"),
                (wall    , "tooltips/wall.png"),
@@ -212,4 +240,5 @@ tooltipFiles =[(fire    , "tooltips/fire.png"),
                (torch   , "tooltips/torch.png"),
                (plant   , "tooltips/plant.png"),
                (spout   , "tooltips/spout.png"),
-               (metal   , "tooltips/metal.png")]
+               (metal   , "tooltips/metal.png"),
+               (lava    , "tooltips/lava.png")]
