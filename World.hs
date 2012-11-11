@@ -73,7 +73,8 @@ plant           = 24
 spout           = 25
 metal           = 26
 lava            = 27
-wall            = 100
+turnip          = 126
+wall            = 127
 
 
 {-# INLINE isWall #-}
@@ -82,7 +83,7 @@ isWall 23  = True     -- torch
 isWall 24  = True     -- plant
 isWall 25  = True     -- spout
 isWall 26  = True     -- metal
-isWall 100 = True     -- wall
+isWall 127 = True     -- wall
 isWall _   = False
 
 {-# INLINE isFire #-}
@@ -113,10 +114,14 @@ weight x | isFire x  = 0
 {-# INLINE age #-}
 age :: Int -> Element -> Element
 age gen x 
+  -- fire eventually goes out
   | x == fire_end = nothing
   | isFire x      = if gen < 50 then x + 1 else x
-  | x == steam_water = if gen < 1 then water else steam_water
+  -- steam eventually condenses
+  | x == steam_water     = if gen < 1 then water else steam_water
   | x == steam_condensed = if gen < 5 then water else steam_condensed
+  -- turnip being turnip
+  | x == turnip = x
   | otherwise     = x
 
 
@@ -140,12 +145,13 @@ colour 8   = bright $ bright $ light $ light blue    -- salt water
 colour 9   = dim yellow                              -- sand   
 colour 10  = greyN 0.95                              -- salt   
 colour 11  = greyN 0.7                               -- stone  
-colour 100 = greyN 0.4                               -- wall   
 colour 23  = bright $ orange                         -- torch
 colour 24  = dim $ green                             -- plant
 colour 25  = blue                                    -- spout
 colour 26  = mixColors (0.2) (0.8) blue (greyN 0.5)  -- metal
 colour 27  = bright red                              -- lava
+colour 126 = violet                                  -- turnip
+colour 127 = greyN 0.4                               -- wall   
 colour x                                             -- fire
   | isFire x  = mixColors (1.0 * fromIntegral (x - fire)) 
                           (1.0 * fromIntegral (fire_end - x)) 
