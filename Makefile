@@ -6,8 +6,6 @@ GHC_OPTS := \
 	-Odph \
 	-rtsopts \
 	-fno-liberate-case \
-#	-funfolding-use-threshold1000 \
-#	-funfolding-keeness-factor1000 \
 	-funfolding-use-threshold500 \
 	-funfolding-keeness-factor500 \
 	-fllvm \
@@ -21,7 +19,7 @@ GHC_WARNINGS	:= \
 	-fwarn-missing-fields \
 	-fwarn-overlapping-patterns \
 	-fwarn-type-defaults \
-#	-fwarn-unused-binds \
+	-fwarn-unused-binds \
 	-fwarn-unused-imports \
 	-fno-warn-missing-methods
 
