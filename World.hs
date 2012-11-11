@@ -150,13 +150,14 @@ render world
              R.++ (R.transpose buttons)
              R.++ (R.transpose $ R.map colour $ array world) 
              
-
+brown :: Color
+brown = makeColor (129/255) (49/255) (29/255) 1
 
 colour :: Element -> Color
 colour 0   = black                                   -- nothing
 colour 1   = bright $ light $ light $ light blue     -- steam           
 colour 2   = bright $ light $ light $ light blue     -- steam condensed           
-colour 6   = dark $ dim $ dim orange                 -- oil    
+colour 6   = brown                                   -- oil    
 colour 7   = bright $ bright $ light blue            -- water  
 colour 8   = bright $ bright $ light $ light blue    -- salt water
 colour 9   = dim yellow                              -- sand   
@@ -200,10 +201,6 @@ buttons = R.fromList (Z :. buttonH + paddingH :. resX)
                                 red yellow
             in  side ++ (concat $ intersperse gap $ oneBox' col : map oneBox selectableElems) ++ side
 
-selectableElems :: [Element]
-selectableElems = [ wall, nothing, turnip
-                  , oil, water, sand, salt, stone
-                  , torch, plant, spout, metal, lava ]
 
 resX, resY, resWidth, resHeight, paddingH, tooltipH, gapSize, sideSize, buttonW, buttonH :: Int
 -- size of the world
@@ -236,22 +233,26 @@ palletteH = (fromIntegral buttonH + fromIntegral paddingH + fromIntegral tooltip
 outOfWorld :: GlossCoord -> Bool
 outOfWorld (_, y) = round y + resHeight < 0
 
+selectableElems :: [Element]
+selectableElems
+ = [ torch, water, spout, plant, stone, metal, lava, oil, salt, sand, nothing, wall, turnip ]
+
 elemOf :: GlossCoord -> Element
 elemOf ((subtract 5) . (+ resWidth) . round -> x, _)
-  | x < buttonW               = fire
-  | x <      gapSize + 2  * buttonW = wall
-  | x < 2  * gapSize + 3  * buttonW = nothing
-  | x < 3  * gapSize + 4  * buttonW = turnip
-  | x < 4  * gapSize + 5  * buttonW = oil
-  | x < 5  * gapSize + 6  * buttonW = water
-  | x < 6  * gapSize + 7  * buttonW = sand
-  | x < 7  * gapSize + 8  * buttonW = salt
-  | x < 8  * gapSize + 9  * buttonW = stone
-  | x < 9  * gapSize + 10 * buttonW = torch
-  | x < 10 * gapSize + 11 * buttonW = plant 
-  | x < 11 * gapSize + 12 * buttonW = spout
-  | x < 12 * gapSize + 13 * buttonW = metal
-  | otherwise                       = lava  
+  | x < buttonW                     = fire
+  | x <      gapSize + 2  * buttonW = torch
+  | x < 2  * gapSize + 3  * buttonW = water
+  | x < 3  * gapSize + 4  * buttonW = spout
+  | x < 4  * gapSize + 5  * buttonW = plant
+  | x < 5  * gapSize + 6  * buttonW = stone
+  | x < 6  * gapSize + 7  * buttonW = metal
+  | x < 7  * gapSize + 8  * buttonW = lava
+  | x < 8  * gapSize + 9  * buttonW = oil
+  | x < 9  * gapSize + 10 * buttonW = salt
+  | x < 10 * gapSize + 11 * buttonW = sand
+  | x < 11 * gapSize + 12 * buttonW = nothing
+  | x < 12 * gapSize + 13 * buttonW = wall
+  | otherwise                       = turnip
 
 tooltipFiles =[(fire    , "tooltips/fire.png"),
                (wall    , "tooltips/wall.png"),
