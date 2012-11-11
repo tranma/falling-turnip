@@ -43,4 +43,31 @@ applyAlchemy r 7 26 = if r < 1 then (water, sand) else (water, metal)
 applyAlchemy r 26 8 = if r < 3 then (sand, salt_water) else (metal, salt_water)
 applyAlchemy r 8 26 = if r < 3 then (salt_water, sand) else (salt_water, metal)
 
+-- lava + stone = 2 x lava
+applyAlchemy r 27 11 = if r < 5 then (lava, lava) else (lava, stone)
+applyAlchemy r 11 27 = if r < 5 then (lava, lava) else (stone, lava)
+
+-- lava + metal/sand/salt = 2 x lava
+applyAlchemy r 27 26 = if r < 1 then (lava, lava) else (lava, metal)
+applyAlchemy r 26 27 = if r < 1 then (lava, lava) else (metal, lava)
+applyAlchemy r 27 9  = if r < 50 then (lava, lava) else (lava, sand)
+applyAlchemy r 9 27  = if r < 50 then (lava, lava) else (sand, lava)
+applyAlchemy r 27 10 = if r < 50 then (lava, lava) else (lava, salt)
+applyAlchemy r 10 27 = if r < 50 then (lava, lava) else (salt, lava)
+
+-- lava + oil/plant = lava + fire
+applyAlchemy r 27 6 = if r < 80 then (lava, fire) else (lava, oil)
+applyAlchemy r 6 27 = if r < 80 then (fire, lava) else (oil, lava)
+applyAlchemy r 27 24 = if r < 80 then (lava, fire) else (lava, plant)
+applyAlchemy r 24 27 = if r < 80 then (fire, lava) else (plant, lava)
+
+-- water + lava = steam + stone
+applyAlchemy _ 7 27 = (steam_water, stone)
+applyAlchemy _ 27 7 = (stone, steam_water)
+
+-- salt_water + lava = steam + stone OR steam + salt
+applyAlchemy r 8 27 = if r < 20 then (steam_water, salt) else (steam_water, stone)
+applyAlchemy r 27 8 = if r < 20 then (salt, steam_water) else (stone, steam_water)
+
+
 applyAlchemy _ a b = (a, b)

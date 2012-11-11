@@ -5,7 +5,7 @@ module World
        , Weight (..), WeightEnv (..)
        
        , nothing, steam_water, steam_condensed, fire, fire_end, oil
-       , water, salt_water, sand, salt, stone, torch, plant, spout, metal, wall
+       , water, salt_water, sand, salt, stone, torch, plant, spout, metal, wall, lava
 
        , isFluid, isWall, isFire  
        , weight, age
@@ -105,8 +105,8 @@ weight :: Element -> Weight
 weight 0  = 2      -- nothing
 weight 1  = 0      -- steam water
 weight 2  = 0      -- steam water
-weight 10 = salt   -- sand == salt
-weight 27 = stone  -- lava == stone
+weight 9  = salt   -- sand == salt
+weight 27 = water  -- lava == water
 weight x | isFire x  = 0
          | otherwise = fromIntegral x
 
