@@ -1,0 +1,26 @@
+Name:                falling-turnip
+Version:             0.1
+Author:              Tran Ma
+Maintainer:          tranm@cse.unsw.edu.au
+Build-Type:          Simple
+Cabal-Version:       >=1.6
+Description:
+        Falling sand game/cellular automata simulation using regular parallel arrays.
+
+Tested-with: GHC == 7.4.1
+
+Executable falling-turnip
+  Main-is: Main.hs
+
+  Build-depends:
+        base              == 4.*,
+        gloss             == 1.7.*,
+        gloss-raster      == 1.7.7.*,
+        repa              == 3.2.*,
+        repa-algorithms   == 3.2.*,
+        vector            == 0.9.*,
+        random            == 1.*,
+        JuicyPixels-repa  == 0.6.1
+
+  ghc-options:
+        -threaded -O3 -Odph -rtsopts -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000 -fllvm -optlo-O3 -with-rtsopts=-N -with-rtsopts=-qa -with-rtsopts=-qg 

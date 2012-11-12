@@ -1,5 +1,7 @@
 Falling Turnip is an interactive particle simulation. Like others in the same genre (typically dubbed "falling sand games"), it has some degree of approximation for gravity, fluid flow and alchemical reactions. Unlike the others, it is based entirely on cellular automata and runs in parallel.
 
+A short demo video is available [here](http://youtu.be/hlL9yi2hGx0).
+
 In our simulation, each pixel is a cellular automation and all physical reactions are phrased as cellular automata rules. This approach enables us to take advantage of the massively distributed/parallel nature of cellular automata, however expressing gravity and fluid behaviour as automata rules has proven challenging.
 
 Background
@@ -42,6 +44,31 @@ Performance
 The novelty of our simulation lies with the use of cellular automata --- a highly distributed/parallel structure to model physics. In this implementation we use data parallelism to take advantage of this property, however it is not difficult to translate the logic to fit in a distributed scenario.
 
 This project also serves as a testament to the effectiveness of data parallelism in general and the Repa library in particular. Adding more processing cores improves performance without any added effort on the part of the programmer.
+
+
+Notes
+=====
+
+Assuming you have GHC and cabal installed (if not, get the Haskell platform [here](http://www.haskell.org/platform/)), to build `falling-turnip` simply go `cabal configure && cabal build`. Alternatively, use `make`:
+
+      cabal update
+      cabal install gloss
+      cabal install gloss-raster
+      cabal install repa-3.2
+      cabal install vector
+      cabal install random
+      cabal install JuicyPixels-repa
+      make
+
+Use the following run-time options for optimal performance:
+
+      +RTS -N<number of cores> -qa -qg
+
+For example:
+
+      ./Main +RTS -N7 -qa -qg
+
+The name "Falling Turnip" comes from Repa, which stands for Regular Parallel Arrays, and also means "turnip" in Russian.
 
 Bibliography
 ============

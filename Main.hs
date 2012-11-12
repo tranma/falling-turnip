@@ -8,8 +8,10 @@ import qualified Data.Array.Repa.Repr.Vector     as R
 import Graphics.Gloss              
 import Graphics.Gloss.Raster.Array 
 import Graphics.Gloss.Interface.Pure.Game  
+
 -- JuicyPixels-repa
 import qualified Codec.Picture.Repa as J
+
 -- base
 import Control.Monad
 import System.Random
