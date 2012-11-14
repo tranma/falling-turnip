@@ -52,12 +52,7 @@ Notes
 Assuming you have GHC and cabal installed (if not, get the Haskell platform [here](http://www.haskell.org/platform/)), to build `falling-turnip` simply go `cabal configure && cabal build`. Alternatively, use `make`:
 
       cabal update
-      cabal install gloss
-      cabal install gloss-raster
-      cabal install repa-3.2
-      cabal install vector
-      cabal install random
-      cabal install JuicyPixels-repa
+      cabal install gloss gloss-raster repa-3.2 vector random JuicyPixels-repa
       make
 
 Use the following run-time options for optimal performance:
