@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternGuards #-}
 module Draw
        (drawLine)
 where

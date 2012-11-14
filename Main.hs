@@ -21,7 +21,7 @@ import Data.Maybe
 import World
 import Step
 import Draw
-
+import Paths_falling_turnip
 import Data.Word
 
 main :: IO ()                     
@@ -49,7 +49,7 @@ main = do
         bareWorld = const nothing
 
 loadTooltip :: (Element, FilePath) -> IO (Element, R.Array R.V R.DIM2 Color)
-loadTooltip (e, p) = liftM ((e,) . either (error) fromJuicy) $ J.readImageRGBA p
+loadTooltip (e, p) = getDataFileName p >>= \p' -> liftM ((e,) . either (error) fromJuicy) $ J.readImageRGBA p'
   where toF :: Word8 -> Float
         toF x = fromIntegral x / 255
         fromJuicy :: J.Collapsable a (Word8, Word8, Word8, Word8) => J.Img a -> R.Array R.V R.DIM2 Color
