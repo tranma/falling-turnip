@@ -5,9 +5,9 @@ import Data.Array.Repa (Z (..), (:.) (..))
 import qualified Data.Array.Repa                 as R
 import qualified Data.Array.Repa.Repr.Vector     as R
 -- Gloss
-import Graphics.Gloss              
-import Graphics.Gloss.Raster.Array 
-import Graphics.Gloss.Interface.Pure.Game  
+import Graphics.Gloss
+import Graphics.Gloss.Raster.Array
+import Graphics.Gloss.Interface.Pure.Game
 
 -- JuicyPixels-repa
 import qualified Codec.Picture.Repa as J
@@ -24,8 +24,8 @@ import Draw
 import Paths_falling_turnip
 import Data.Word
 
-main :: IO ()                     
-main = do  
+main :: IO ()
+main = do
   tooltips <- mapM loadTooltip tooltipFiles
   playArrayIO
     (InWindow "Falling Turnip" (winX * round factor, winY * round factor) (pos, pos))
@@ -36,11 +36,11 @@ main = do
            , currGravityMask = margMaskEven
            , nextGravityMask = margMaskOdd
            , mouseDown       = False
-           , mousePos        = (0,0) 
-           , mousePrevPos    = (0,0) 
-           , tooltipLeft     = blankTooltip 
-           , tooltipRight    = blankTooltip 
-           }) 
+           , mousePos        = (0,0)
+           , mousePrevPos    = (0,0)
+           , tooltipLeft     = blankTooltip
+           , tooltipRight    = blankTooltip
+           })
     ( return    . render)
     ((return .) . handleInput)
     (stepWorld tooltips)
@@ -54,7 +54,7 @@ loadTooltip (e, p) = getDataFileName p >>= \p' -> liftM ((e,) . either (error) f
         toF x = fromIntegral x / 255
         fromJuicy :: J.Collapsable a (Word8, Word8, Word8, Word8) => J.Img a -> R.Array R.V R.DIM2 Color
         fromJuicy = (R.computeS . flip . R.map (\(a,b,c,d) -> makeColor (toF b) (toF c) (toF d) (toF a) ) . J.collapseColorChannel)
-        flip = R.backpermute (Z :. 15 :. 160) (\(Z:. y :. x) -> Z :. (14 - y) :. x )                 
+        flip = R.backpermute (Z :. 15 :. 160) (\(Z:. y :. x) -> Z :. (14 - y) :. x )
 
 handleInput :: Event -> World -> World
 handleInput e w = handleInput' (w {mousePrevPos = mousePos w})
@@ -82,7 +82,7 @@ blankTooltip = R.computeS $ R.fromFunction (Z :. 15 :. 160) (const black)
 
 handleUI :: [(Element, R.Array R.V R.DIM2 Color)] -> GlossCoord -> World -> World
 handleUI t p w = let tooltip = fromMaybe blankTooltip $ flip lookup t $ elemOf p
-                 in if mouseDown w then 
+                 in if mouseDown w then
                      w {currentElem = elemOf p, tooltipLeft = tooltip
                                               , tooltipRight = tooltip }
                     else w { tooltipRight = tooltip }
@@ -91,15 +91,15 @@ stepWorld :: [(Element, R.Array R.V  R.DIM2 Color)] -> Float -> World -> IO Worl
 stepWorld tooltips time world
  = let curr = mousePos world
        world' = if outOfWorld curr then handleUI tooltips curr world else world { tooltipRight = blankTooltip }
-   in  do int     <- randomRIO (0,100)                            
-          stepped <- if   mouseDown world 
+   in  do int     <- randomRIO (0,100)
+          stepped <- if   mouseDown world
                      then liftM (step int $ currGravityMask world')
                              $  drawLine (mousePrevPos world') curr
                                          (currentElem  world') (array world')
-                     else return $ step int (currGravityMask world') 
+                     else return $ step int (currGravityMask world')
                                  $ array world'
           array'  <- R.computeP stepped
           return $ world' { array = array'
                           , currGravityMask = nextGravityMask world'
-                          , nextGravityMask = currGravityMask world' } 
+                          , nextGravityMask = currGravityMask world' }
 
