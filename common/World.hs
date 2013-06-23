@@ -39,8 +39,8 @@ type Matrix x = A.Array A.DIM2 x
 type Element   = Word32
 type Cell      = Word32
 type Env       = Word32
-type Weight    = Word32
-type WeightEnv = Word32
+type Weight    = Word8
+type WeightEnv = Word8
 
 -- | Positions in a Margolus neighbourhood
 type MargPos = Int
@@ -118,14 +118,14 @@ isFire :: Element -> Bool
 isFire x = x >= fire && x <= fire_end
 
 {-# INLINE isFluid #-}
-isFluid :: Element -> Element
+isFluid :: Element -> Weight
 isFluid 0  = 0     -- nothing
-isFluid 1  = 0x40  -- steam
-isFluid 2  = 0x40
-isFluid 6  = 0x40  -- oil
-isFluid 7  = 0x40  -- water
-isFluid 8  = 0x40  -- salt water
-isFluid 27 = 0x40  -- lav
+isFluid 1  = 2 
+isFluid 2  = 2 
+isFluid 6  = 2 -- oil
+isFluid 7  = 2 -- water
+isFluid 8  = 2 -- salt water
+isFluid 27 = 2 -- lav
 isFluid _  = 0
 
 {-# INLINE weight #-}
@@ -133,8 +133,8 @@ weight :: Element -> Weight
 weight 0  = 2      -- nothing
 weight 1  = 0      -- steam water
 weight 2  = 0      -- steam water
-weight 9  = salt   -- sand == salt
-weight 27 = water  -- lava == water
+weight 9  = fromIntegral $ salt   -- sand == salt
+weight 27 = fromIntegral $ water  -- lava == water
 weight x | isFire x  = 0
          | otherwise = fromIntegral x
 

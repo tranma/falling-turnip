@@ -34,7 +34,8 @@ executable falling-turnip
                , gloss-raster     >= 1.7
                , JuicyPixels-repa >= 0.6
                , random           >= 1.0
+               , binary-literal-qq >= 1.0
                , QuickCheck       >= 2.4
                , repa-algorithms  >= 3.2
   ghc-options:
-        -threaded -O3 -Odph -rtsopts -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000 -fllvm -optlo-O3 -with-rtsopts=-N -with-rtsopts=-qa -with-rtsopts=-qg 
+        -threaded -O3 -Odph -rtsopts -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000 -fllvm -optlo-O3 -with-rtsopts=-N -with-rtsopts=-qa -with-rtsopts=-qg -fsimpl-tick-factor=200

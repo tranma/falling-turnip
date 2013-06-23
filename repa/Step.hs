@@ -63,6 +63,11 @@ combine :: (Cell, Cell, Cell, Cell) -> Env
 combine (ul, ur, dl, dr)
  = ul .|. (shiftL ur 8) .|. (shiftL dl 16) .|. (shiftL dr 24)
 
+{-# INLINE combine' #-}
+combine' :: (Weight, Weight, Weight, Weight) -> WeightEnv
+combine' (ul, ur, dl, dr)
+ = ul .|. (shiftL ur 2) .|. (shiftL dl 4) .|. (shiftL dr 6)
+
 
 -- | Apply gravity to the cell at quadrant 'pos' in 'env'
 --      returning the quadrant it should swap with
@@ -76,16 +81,18 @@ weigh (env, pos)
         heaviest = max (max (weight ul') (weight ur'))
                        (max (weight dl') (weight dr'))
 
+
         -- Compare each cell with the heaviest, lowest bit set if >=
         ul, ur, dl, dr :: Weight
-        ul = (0x80 .&. (heaviest - 1 - weight ul')) .|. isFluid ul'
-        ur = (0x80 .&. (heaviest - 1 - weight ur')) .|. isFluid ur'
-        dl = (0x80 .&. (heaviest - 1 - weight dl')) .|. isFluid dl'
-        dr = (0x80 .&. (heaviest - 1 - weight dr')) .|. isFluid dr'
-        weighed1 = combine (ul, ur, dl, dr)
+        ul = (if (weight ul' >= heaviest) then 1 else 0) .|. isFluid ul'
+        ur = (if (weight ur' >= heaviest) then 1 else 0) .|. isFluid ur'
+        dl = (if (weight dl' >= heaviest) then 1 else 0) .|. isFluid dl'
+        dr = (if (weight dr' >= heaviest) then 1 else 0) .|. isFluid dr'
+        weighed1 = combine' (ul, ur, dl, dr)
 
         -- Apply gravity with respect to the heaviest
-        x' = applyGravity (weighed1 .|. shiftL 1 (8 * pos))
+        x' =  applyGravity weighed1 pos -- .|. shiftL 1 (8 * pos))
+
         x  = if isWall (margQuadrant x' env) then pos else x'
 
         -- The second heaviest item
@@ -96,18 +103,18 @@ weigh (env, pos)
 
         -- Compare each cell with the second heaviest, lowest bit set if >=
         ul2, ur2, dl2, dr2 :: Weight
-        ul2 = (0x80 .&. (nextHeaviest - 1 - weight ul')) .|. isFluid ul'
-        ur2 = (0x80 .&. (nextHeaviest - 1 - weight ur')) .|. isFluid ur'
-        dl2 = (0x80 .&. (nextHeaviest - 1 - weight dl')) .|. isFluid dl'
-        dr2 = (0x80 .&. (nextHeaviest - 1 - weight dr')) .|. isFluid dr'
-        weighed2 = combine (ul2, ur2, dl2, dr2)
+        ul2 = (if (weight ul' >= nextHeaviest) then 1 else 0) .|. isFluid ul'
+        ur2 = (if (weight ur' >= nextHeaviest) then 1 else 0) .|. isFluid ur'
+        dl2 = (if (weight dl' >= nextHeaviest) then 1 else 0) .|. isFluid dl'
+        dr2 = (if (weight dr' >= nextHeaviest) then 1 else 0) .|. isFluid dr'
+        weighed2 = combine' (ul2, ur2, dl2, dr2)
 
         -- Apply gravity with respect to the second heaviest
-        y' = applyGravity (weighed2 .|. shiftL 1 (8 * pos))
+        y' =  applyGravity weighed2  pos
         y  = if isWall (margQuadrant y' env) then pos else y'
 
         -- Compose the two gravity passes
-        ydest' = applyGravity (weighed1 .|. shiftL 1 (8 * y))
+        ydest' =  applyGravity (weighed1) y
         ydest = if isWall (margQuadrant ydest' env) then y else ydest'
 
     in if      (ul' == ur' && ur' == dl' && dl' == dr')   then pos
