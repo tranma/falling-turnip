@@ -1,13 +1,13 @@
-module Gravity 
+module Repa.Gravity
       (applyGravity)
 where
 
 import Data.Bits
-import World
+import Common.World
 
 -- Black magic for gravity
 -- Possible values:
--- 
+--
 --  L liquid      C0
 --  L liq, focus  C1
 --  ~ liq, space  40
@@ -18,7 +18,7 @@ import World
 --  ~ non-focused 00
 --  ~ focused     01
 applyGravity :: WeightEnv -> MargPos
-applyGravity wenv = case wenv of 
+applyGravity wenv = case wenv of
   -- L L --> L L
   -- L ~     ~ L
   0x01C0C0C0 -> 2
@@ -28,7 +28,7 @@ applyGravity wenv = case wenv of
   0x40C0C1C0 -> 1
   0x00C0C1C0 -> 1
   0x40C0C0C1 -> 0
-  0x00C0C0C1 -> 0  
+  0x00C0C0C1 -> 0
   -- L L --> L L
   -- ~ L     L ~
   0xC001C0C0 -> 3
@@ -38,7 +38,7 @@ applyGravity wenv = case wenv of
   0xC040C1C0 -> 1
   0xC000C1C0 -> 1
   0xC040C0C1 -> 0
-  0xC000C0C1 -> 0 
+  0xC000C0C1 -> 0
   -- L ~ --> ~ L
   -- * *     * *
   0x808000C1 -> 1
@@ -56,7 +56,7 @@ applyGravity wenv = case wenv of
   0xC0C000C1 -> 1
   0xC0C001C0 -> 0
   0xC0C040C1 -> 1
-  0xC0C041C0 -> 0 
+  0xC0C041C0 -> 0
   -- ~ L --> L ~
   -- * *     * *
   0x8080C100 -> 0
@@ -74,15 +74,15 @@ applyGravity wenv = case wenv of
   0xC0C0C100 -> 0
   0xC0C0C001 -> 1
   0xC0C0C140 -> 0
-  0xC0C0C041 -> 1 
+  0xC0C0C041 -> 1
   -- ~ ~ --> ~ ~
   -- L ~     ~ L
   0x00C10000 -> 3
   0x01C00000 -> 2
   0x40C10000 -> 3
-  0x41C00000 -> 2 
+  0x41C00000 -> 2
   0x00C14000 -> 3
-  0x01C04000 -> 2 
+  0x01C04000 -> 2
   0x40C14000 -> 3
   0x41C04000 -> 2
   0x00C10040 -> 3
@@ -110,7 +110,7 @@ applyGravity wenv = case wenv of
   0xC1004040 -> 2
   0xC0014040 -> 3
   0xC1404040 -> 2
-  0xC0414040 -> 3 
+  0xC0414040 -> 3
   _ -> case (wenv .&. 0x81818181) of
     -- * ~ --> ~ ~
     -- ~ ~     * ~

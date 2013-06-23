@@ -23,8 +23,8 @@ GHC_WARNINGS	:= \
 	-fwarn-unused-imports \
 	-fno-warn-missing-methods
 
-$(PROGNAME): Main.hs
-	ghc $(GHC_OPTS) $(GHC_WARNINGS) --make Main.hs
+$(PROGNAME): accelerate/Main.hs
+	ghc $(GHC_OPTS) $(GHC_WARNINGS) --make repa/Main.hs
 
 clean:
 	rm -f *.hi *.o *_stub.c *_stub.h $(PROGNAME)

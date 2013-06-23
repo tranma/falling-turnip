@@ -1,11 +1,14 @@
 {-# LANGUAGE PatternGuards #-}
-module Draw
-       (drawLine)
+module Common.Draw
+       (drawLineU, drawLineA)
 where
 
 -- Repa
 import Data.Array.Repa (Z (..), (:.) (..), U, DIM2, Array)
 import qualified Data.Array.Repa                 as R
+
+-- Acc
+import Data.Array.Accelerate.IO
 
 -- base
 import Control.Monad
@@ -14,13 +17,13 @@ import qualified Data.STRef
 import qualified Data.Vector.Unboxed             as UV
 import qualified Data.Vector.Generic.Mutable     as MV
 
-import World
+import Common.World
 
 
 -- | Draw a line onto the Repa array
-drawLine :: GlossCoord -> GlossCoord -> Cell -> Array U DIM2 Cell -> IO (Array U DIM2 Cell)
-drawLine (xa, ya) (xb, yb) new array
-  | sh@(Z :. _ :. width) <- R.extent array  
+drawLineU :: GlossCoord -> GlossCoord -> Cell -> Array U DIM2 Cell -> IO (Array U DIM2 Cell)
+drawLineU (xa, ya) (xb, yb) new array
+  | sh@(Z :. _ :. width) <- R.extent array
   , (x0, y0, x1, y1)     <- ( round xa + resWidth, round ya + resHeight
                             , round xb + resWidth, round yb + resHeight )
   , x0 < resX - 2, x1 < resX - 2, y0 < resY - 2, y1 < resY - 2, x0 > 2, y0 > 2, x1 > 2, y1 > 2
@@ -29,6 +32,12 @@ drawLine (xa, ya) (xb, yb) new array
        raw' <- UV.unsafeFreeze raw
        return $ R.fromUnboxed sh raw'
   | otherwise = return array
+
+-- | Draw a line onto the Repa array backed by Accelerate
+drawLineA :: GlossCoord -> GlossCoord -> Cell -> Array A DIM2 Cell -> IO (Array A DIM2 Cell)
+drawLineA (xa, ya) (xb, yb) new array
+  -- FIXME input check here as well, maybe faster
+  = R.copyP array >>= drawLineU (xa, ya) (xb, yb) new >>= R.copyP
 
 -- Bresenham's line drawing, copypasted from
 -- http://rosettacode.org/wiki/Bitmap/Bresenham's_line_algorithm
@@ -45,12 +54,12 @@ bresenham vec ix val (xa, ya) (xb, yb)
             mutate yV (+ ystep)
             mutate errorV (+ deltax)))
     where steep = abs (yb - ya) > abs (xb - xa)
-          (xa', ya', xb', yb') 
-            = if steep 
+          (xa', ya', xb', yb')
+            = if steep
               then (ya, xa, yb, xb)
               else (xa, ya, xb, yb)
           (x1, y1, x2, y2)
-            = if xa' > xb' 
+            = if xa' > xb'
               then (xb', yb', xa', ya')
               else (xa', ya', xb', yb')
           deltax = x2 - x1

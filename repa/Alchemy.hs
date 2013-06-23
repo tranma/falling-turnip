@@ -1,6 +1,6 @@
-module Alchemy where
+module Repa.Alchemy where
 
-import World
+import Common.World
 
 applyAlchemy :: Int -> Element -> Element -> (Element, Element)
 -- water + salt = salt_water + nothing
@@ -13,7 +13,7 @@ applyAlchemy _ 1 w | isWall w = (steam_condensed, wall)
 
 -- water evaporates: water/salt_water + <some fire> = steam + nothing
 applyAlchemy _ 7 f | isFire f = (steam_water, nothing)
-applyAlchemy _ f 7 | isFire f = (nothing, steam_water) 
+applyAlchemy _ f 7 | isFire f = (nothing, steam_water)
 applyAlchemy _ f 8 | isFire f = (steam_water, salt)
 applyAlchemy _ 8 f | isFire f = (steam_water, salt)
 
