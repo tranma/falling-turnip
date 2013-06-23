@@ -4,3 +4,7 @@ cabal-dev
 *.hi
 *.chi
 *.chs.h
+accelerate/Main
+repa/Main
+*.swp
+/Main

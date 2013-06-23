@@ -26,6 +26,7 @@ applyGravity x n = let (a,b,c,d) = applyGravity' x
                     in case n of 0 -> a; 1 -> b; 2 -> c; 3 -> d
 
 {-# INLINE ignoreL #-}
+ignoreL :: MargPos -> WeightEnv -> WeightEnv
 ignoreL 0 x = x .&. [b|11 11 11 01|]
 ignoreL 1 x = x .&. [b|11 11 01 11|]
 ignoreL 2 x = x .&. [b|11 01 11 11|]
