@@ -9,7 +9,8 @@ GHC_OPTS := \
 	-funfolding-use-threshold1000 \
 	-funfolding-keeness-factor1000 \
 	-fllvm \
-	-optlo-O3
+	-optlo-O3 \
+	-fsimpl-tick-factor=200
 
 GHC_WARNINGS	:= \
 	-Werror \
