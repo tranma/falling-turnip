@@ -1,20 +1,22 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-import Data.Array.Repa (Z (..), (:.) (..), D, DIM2, Array)
+import Data.Array.Repa (Z (..), (:.) (..)) -- , D, DIM2, Array)
 import qualified Data.Array.Repa                 as R
+import qualified Data.Array.Repa.Repr.Vector     as R
 
 import Data.Array.Accelerate.IO
-import Data.Array.Accelerate ((==*), (<*), (>*), (||*), Acc, Exp, (?))
 import qualified Data.Array.Accelerate           as A
 import qualified Data.Array.Accelerate.CUDA      as C
 
 import Graphics.Gloss
 import Graphics.Gloss.Raster.Array
-import Graphics.Gloss.Interface.Pure.Game
+
+import System.Random
 
 import Common.Draw
-import Common.World
+import Accelerate.World
 import Common.Event
+import Accelerate.Step
 
 main :: IO ()
 main = do
@@ -40,7 +42,7 @@ main = do
         pos       = 300
         bareWorld = const nothing
 
-stepWorld :: [(Element, R.Array R.V  R.DIM2 Color)] -> Float -> WorldU -> IO WorldU
+stepWorld :: [(Element, R.Array R.V  R.DIM2 Color)] -> Float -> WorldA -> IO WorldA
 stepWorld tooltips time world
  = let curr = mousePos world
        world' = if outOfWorld curr
@@ -48,13 +50,13 @@ stepWorld tooltips time world
                 else world { tooltipRight = blankTooltip }
    in  do int     <- randomRIO (0,100)
           stepped <- if   mouseDown world
-                     then liftM (step int $ currGravityMask world')
-                             $  drawLineA (mousePrevPos world') curr
-                                          (currentElem  world') (array world')
+                     then do drawn <- drawLineA (mousePrevPos world') curr
+                                                (currentElem  world') (array world')
+                             return $ step int (currGravityMask world') (A.use $ fromRepa  drawn)
                      else return $ step int (currGravityMask world')
-                                 $ array world'
-          array'  <- R.computeP stepped
-          return $ world' { array = array'
+                                 $ A.use $ fromRepa $ array  world'
+          array'  <- return $ C.run stepped
+          return $ world' { array = toRepa $ array'
                           , currGravityMask = nextGravityMask world'
                           , nextGravityMask = currGravityMask world' }
 

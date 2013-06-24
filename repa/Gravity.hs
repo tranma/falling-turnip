@@ -6,6 +6,7 @@ where
 import Data.Bits
 import Common.World
 import Language.Literals.Binary
+
 -- Black magic for gravity
 -- Possible values:
 --
@@ -19,7 +20,6 @@ import Language.Literals.Binary
 --  ~ non-focused 00
 --  ~ focused     01
 --
-
 
 applyGravity :: WeightEnv -> MargPos -> MargPos
 applyGravity x n = let (a,b,c,d) = applyGravity' x

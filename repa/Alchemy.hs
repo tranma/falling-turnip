@@ -1,6 +1,7 @@
 module Repa.Alchemy where
 
 import Common.World
+import Repa.World
 
 applyAlchemy :: Int -> Element -> Element -> (Element, Element)
 -- water + salt = salt_water + nothing

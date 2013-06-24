@@ -1,145 +1,152 @@
-module Repa.Step
+{-# LANGUAGE ViewPatterns #-}
+module Accelerate.Step
      ( step
      , margMaskEven, margMaskOdd, weigh, combine )
 where
 
--- Repa
-import Data.Array.Repa (Z (..), (:.) (..), U, D, DIM2, Array)
-import Data.Array.Repa.Stencil
-import qualified Data.Array.Repa                 as R
-import qualified Data.Array.Repa.Repr.Unboxed    as R
-import qualified Data.Array.Repa.Stencil.Dim2    as R
-import Data.Array.Repa.Algorithms.Randomish      as R
+-- Acc
+import Data.Array.Accelerate (Acc, Exp, Z(..), (:.)(..), (?), (>=*), (&&*), (||*), (==*), (/=*))
+import qualified Data.Array.Accelerate           as A
 
 -- base
 import Data.Bits
 
-
 -- friends
-import Common.World
-import Repa.Gravity
-import Repa.Alchemy
+import Accelerate.World
+import Accelerate.Gravity
+import Accelerate.Alchemy
+--import Accelerate.World
+import Random.Array
 
 {-# INLINE step #-}
 step :: Int -> Acc (Matrix MargPos) -> Acc (Matrix Cell) -> Acc (Matrix Cell)
 step gen mask array
-  = let randomish = randomArray (uniformR (0, 100)) (Z :. resY :. resX)
-        envs = A.stencil2 R.Clamp array R.Clamp mask
-
-        envs  = R.zipWith (\a (b,c) -> (alchemy a b, c)) randomish
-              $ R.mapStencil2 (BoundFixed (nothing, 0)) margStencil
-              $ R.zip array mask
-    in  R.zipWith age randomish
-      $ R.zipWith mkCell envs
-      $ R.map weigh envs
+  = let randomish = A.use $ randomArray (uniformR (0, 100)) (Z:.resY:.resX)
+        envs  = A.zipWith (\a x -> A.lift (alchemy a $ A.fst x, A.snd x)) randomish
+              $ A.stencil margStencil A.Clamp
+              $ A.zip array mask
+    in  A.zipWith age randomish
+      $ A.zipWith mkCell envs
+      $ A.map weigh envs
     where -- Swap cell at position 'p' in the margolus block 'env' with
           --    the cell at 'pos' in the same block
-          mkCell (env,_) pos = margQuadrant pos env
+          mkCell :: Exp (Env, MargPos) -> Exp MargPos -> Exp Cell
+          mkCell x pos = margQuadrant pos $ A.fst x
 
 
 -- | Mask to extract cell at quadrant 'pos'
 {-# INLINE margQuadrant #-}
-margQuadrant :: MargPos -> Env -> Cell
-margQuadrant pos = flip shiftR (8 * pos) . (.&. shiftL 0xff (8 * pos))
+margQuadrant :: Exp MargPos -> Exp Env -> Exp Cell
+margQuadrant pos = flip A.shiftR (8 * pos) . (.&. A.shiftL 0xff (8 * pos))
 
 
 -- | Break up the environment into its four components
 {-# INLINE split #-}
-split :: Env -> (Cell, Cell, Cell, Cell)
+split :: Exp Env -> (Exp Cell, Exp Cell, Exp Cell, Exp Cell)
 split env
  = let ul = (env .&. eight1)
-       ur = (flip shiftR 8 $ env .&. eight2)
-       dl = (flip shiftR 16 $ env .&. eight3)
-       dr = (flip shiftR 24 $ env .&. eight4)
+       ur = (flip A.shiftR 8 $ env .&. eight2)
+       dl = (flip A.shiftR 16 $ env .&. eight3)
+       dr = (flip A.shiftR 24 $ env .&. eight4)
    in (ul, ur, dl, dr)
     where -- Masks for extracting 8-bit slices
           eight1 = 0xff
-          eight2 = shiftL eight1 8
-          eight3 = shiftL eight2 8
-          eight4 = shiftL eight3 8
+          eight2 = A.shiftL eight1 8
+          eight3 = A.shiftL eight2 8
+          eight4 = A.shiftL eight3 8
 
 -- | Combine the lighter/heavier state of all 4 cells into an env
 --     32bits: | DR | DL | UR | UL |
 {-# INLINE combine #-}
-combine :: (Cell, Cell, Cell, Cell) -> Env
+combine :: (Exp Cell, Exp Cell, Exp Cell, Exp Cell) -> Exp Env
 combine (ul, ur, dl, dr)
- = ul .|. (shiftL ur 8) .|. (shiftL dl 16) .|. (shiftL dr 24)
+ = ul .|. (A.shiftL ur 8) .|. (A.shiftL dl 16) .|. (A.shiftL dr 24)
 
 {-# INLINE combine' #-}
-combine' :: (Weight, Weight, Weight, Weight) -> WeightEnv
+combine' :: (Exp Weight, Exp Weight, Exp Weight, Exp Weight) -> Exp WeightEnv
 combine' (ul, ur, dl, dr)
- = ul .|. (shiftL ur 2) .|. (shiftL dl 4) .|. (shiftL dr 6)
+ = ul .|. (A.shiftL ur 2) .|. (A.shiftL dl 4) .|. (A.shiftL dr 6)
 
 
 -- | Apply gravity to the cell at quadrant 'pos' in 'env'
 --      returning the quadrant it should swap with
 {-# INLINE weigh #-}
-weigh :: (Env, MargPos) -> MargPos
-weigh (env, pos)
+weigh :: Exp (Env, MargPos) -> Exp MargPos
+weigh (A.unlift -> (env, pos))
   = let current              = margQuadrant pos env
         (ul', ur', dl', dr') = split env
 
         -- The heaviest item in the environment
-        heaviest = max (max (weight ul') (weight ur'))
-                       (max (weight dl') (weight dr'))
+        heaviest = A.max (A.max (weight ul') (weight ur'))
+                         (A.max (weight dl') (weight dr'))
 
 
         -- Compare each cell with the heaviest, lowest bit set if >=
-        ul, ur, dl, dr :: Weight
-        ul = (if (weight ul' >= heaviest) then 1 else 0) .|. isFluid ul'
-        ur = (if (weight ur' >= heaviest) then 1 else 0) .|. isFluid ur'
-        dl = (if (weight dl' >= heaviest) then 1 else 0) .|. isFluid dl'
-        dr = (if (weight dr' >= heaviest) then 1 else 0) .|. isFluid dr'
+        ul, ur, dl, dr :: Exp Weight
+        ul = ((weight ul' >=* heaviest) ? (1 , 0)) .|. isFluid ul'
+        ur = ((weight ur' >=* heaviest) ? (1 , 0)) .|. isFluid ur'
+        dl = ((weight dl' >=* heaviest) ? (1 , 0)) .|. isFluid dl'
+        dr = ((weight dr' >=* heaviest) ? (1 , 0)) .|. isFluid dr'
         weighed1 = combine' (ul, ur, dl, dr)
 
         -- Apply gravity with respect to the heaviest
         x' =  applyGravity weighed1 pos -- .|. shiftL 1 (8 * pos))
 
-        x  = if isWall (margQuadrant x' env) then pos else x'
+        x  = isWall (margQuadrant x' env) ? (pos, x')
 
-        -- The second heaviest item
-        remainingWeights
-          = filter (/= heaviest)
-                   [weight ul', weight ur', weight dl', weight dr']
-        nextHeaviest = maximum $ remainingWeights
+        nextHeaviest4 :: (Exp Weight, Exp Weight, Exp Weight, Exp Weight)
+                      -> (Exp Weight, Exp Weight, Exp Weight)
+        nextHeaviest4 (a,b,c,d) = A.unlift ((a ==* heaviest) ? (A.lift (b,c,d)
+                                , (b ==* heaviest) ? (A.lift (a,c,d)
+                                , (c ==* heaviest) ? (A.lift (a,b,d)
+                                , A.lift (a,b,c)))))
+        next3 = nextHeaviest4 (weight ul',weight ur',weight dl',weight dr')
+        maxOf3 (a,b,c) = A.max (A.max a b) c
+        nextHeaviest' = maxOf3 next3
+
+        nextHeaviest3 (a,b,c) = A.unlift ((a ==* nextHeaviest') ? (A.lift (b,c)
+                              , (b ==* nextHeaviest') ? (A.lift (a,c)
+                              , A.lift (a,b))))
+
+        nextHeaviest = (nextHeaviest' ==* heaviest) 
+                         ? (uncurry (A.max) (nextHeaviest3 next3), nextHeaviest')
 
         -- Compare each cell with the second heaviest, lowest bit set if >=
-        ul2, ur2, dl2, dr2 :: Weight
-        ul2 = (if (weight ul' >= nextHeaviest) then 1 else 0) .|. isFluid ul'
-        ur2 = (if (weight ur' >= nextHeaviest) then 1 else 0) .|. isFluid ur'
-        dl2 = (if (weight dl' >= nextHeaviest) then 1 else 0) .|. isFluid dl'
-        dr2 = (if (weight dr' >= nextHeaviest) then 1 else 0) .|. isFluid dr'
+        ul2, ur2, dl2, dr2 :: Exp Weight
+        ul2 = ((weight ul' >=* nextHeaviest) ? ( 1 , 0)) .|. isFluid ul'
+        ur2 = ((weight ur' >=* nextHeaviest) ? ( 1 , 0)) .|. isFluid ur'
+        dl2 = ((weight dl' >=* nextHeaviest) ? ( 1 , 0)) .|. isFluid dl'
+        dr2 = ((weight dr' >=* nextHeaviest) ? ( 1 , 0)) .|. isFluid dr'
         weighed2 = combine' (ul2, ur2, dl2, dr2)
 
         -- Apply gravity with respect to the second heaviest
         y' =  applyGravity weighed2  pos
-        y  = if isWall (margQuadrant y' env) then pos else y'
+        y  = isWall (margQuadrant y' env) ? (pos , y')
 
         -- Compose the two gravity passes
         ydest' =  applyGravity (weighed1) y
-        ydest = if isWall (margQuadrant ydest' env) then y else ydest'
+        ydest = isWall (margQuadrant ydest' env) ? (y , ydest')
 
-    in if      (ul' == ur' && ur' == dl' && dl' == dr')   then pos
-       else if (isWall current)                           then pos
-       else if x /= pos || (length remainingWeights <= 1) then x
-       else if ydest == y                                 then y
-       else x
-
+    in (ul' ==* ur' &&* ur' ==* dl' &&* dl' ==* dr') ? ( pos
+     , (isWall current)                              ? ( pos
+     , (x /=* pos ||* nextHeaviest ==* heaviest)     ? ( x
+     , (ydest ==* y )                                ? ( y
+                                                       , x))))
 
 -- | Perform alchemy on a margolus block, with randomised probability of succeeding
 {-# INLINE alchemy #-}
-alchemy :: Int -> Env -> Env
+alchemy :: Exp Int -> Exp Env -> Exp Env
 alchemy i env
  = let (ul0, ur0, dl0, dr0) = split env
        -- Apply interaction among the components
-       (ul1, ur1) = applyAlchemy i ul0 ur0
-       (ur , dr2) = applyAlchemy i ur1 dr0
-       (dr , dl3) = applyAlchemy i dr2 dl0
-       (dl , ul ) = applyAlchemy i dl3 ul1
-   in  if (ul0 == ur0 && ur0 == dl0 && dl0 == dr0)
-       then env
-       else combine (ul, ur, dl, dr)
-
+       (ul1, ur1) = A.unlift $ applyAlchemy i ul0 ur0
+       (ur , dr2) = A.unlift $ applyAlchemy i ur1 dr0
+       (dr , dl3) = A.unlift $ applyAlchemy i dr2 dl0
+       (dl , ul ) = A.unlift $ applyAlchemy i dl3 ul1
+   in  (ul0 ==* ur0 &&* ur0 ==* dl0 &&* dl0 ==* dr0)
+       ? ( env
+         , combine (ul, ur, dl, dr)
+         )
 
 -- Margolus block --------------------------------------------------------------
 
@@ -148,36 +155,29 @@ alchemy i env
 --   2 3 2 3 ....
 --   ...
 {-# INLINE margMaskEven #-}
-margMaskEven :: Array U DIM2 MargPos
+margMaskEven :: Acc (Matrix MargPos)
 margMaskEven
-  = R.computeS $ R.fromFunction (Z:. resY :. resX)
-               $ \(Z:. y :. x) -> x `mod` 2 .|. shiftL (y `mod` 2) 1
+  = A.generate res
+          $ \ix -> let (Z:.y:.x) = A.unlift ix in x `mod` 2 .|. shiftL (y `mod` 2) 1
 
 {-# INLINE margMaskOdd #-}
-margMaskOdd :: Array U DIM2 MargPos
-margMaskOdd = R.computeS $ R.map (flip subtract 3) margMaskEven
+margMaskOdd :: Acc (Matrix MargPos)
+margMaskOdd
+  = A.map (flip subtract 3) margMaskEven
 
 -- | Given a Moore neighbourhood (3x3), find the Margolus neighbourhood (2x2)
 --    and encode it as a number, combined with the Margolus position for each cell
 --
 {-# INLINE margStencil #-}
-margStencil :: A.Stencil3x3 Cell -> Exp Cell
-margStencil ((_, (y0x1',2), (y1x1',0))
-            ,(_, (y0x0 ,3), (y1x0 ,1))
-            ,(_, _        , _       ))
-            = ((((y1x1' .|. shiftL n 8 y1x0) .|. shiftL n 16 y0x1') .|. shiftL n 32 y0x0), 3)
+margStencil :: A.Stencil3x3 (Cell, MargPos) -> Exp (Cell, MargPos)
+margStencil ((y0x0,y0x1,y0x2)
+            ,(y1x0,y1x1,y1x2)
+            ,(y2x0,y2x1,y2x2))
+            = A.lift $ flip (,) (A.snd y1x1) $
+            ( (A.snd y1x1 A.==* 0) A.? (combine (A.fst y1x1, A.fst y1x2, A.fst y2x1, A.fst y2x2)
+            , (A.snd y1x1 A.==* 1) A.? (combine (A.fst y1x0, A.fst y1x1, A.fst y2x0, A.fst y2x1)
+            , (A.snd y1x1 A.==* 2) A.? (combine (A.fst y0x1, A.fst y0x2, A.fst y1x1, A.fst y1x2)
+            ,                          (combine (A.fst y0x0, A.fst y0x1, A.fst y1x0, A.fst y1x1))))))
 
-margStencil ((_, _       , _      )
-            ,(_, (y0x0,2), (y1x0,0))
-            ,(_, (y0x1,3), (y1x1,1)))
-            = ((((y1x0 .|. shiftL n 8 y1x1) .|. shiftL n 16 y0x0) .|. shiftL n 32 y0x1), 2)
 
-margStencil ((_, (y0x1',0), (y1'x1',2))
-            ,(_, (y0x0 ,1), (y1'x0 ,3))
-            ,(_, _        , _        ))
-            = ((((y0x1' .|. shiftL n 8 y0x0) .|. shiftL n 16 y1'x1') .|. shiftL n 32 y1'x0), 1)
 
-margStencil ((_, _       , _        )
-            ,(_, (y0x0,0), (y1'x0,2))
-            ,(_, (y0x1,1), (y1'x1,3)))
-            = ((((y0x0 .|. shiftL n 8 y0x1) .|. shiftL n 16 y1'x0) .|. shiftL n 32 y1'x1), 0)

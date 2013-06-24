@@ -1,10 +1,11 @@
-{-# LANGUAGE ViewPatterns, PatternGuards, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies, ViewPatterns, PatternGuards, FlexibleContexts #-}
 module Common.World
        ( Matrix
        , Element (..), Cell (..)
        , Env (..)
        , Weight (..), WeightEnv (..)
 
+       , elems
        , nothing, turnip, steam_water, steam_condensed, fire, fire_end, oil
        , water, salt_water, sand, salt, stone, torch, plant, spout, metal, wall, lava
 
@@ -26,6 +27,7 @@ import qualified Data.Array.Repa.Eval            as R
 import qualified Data.Array.Repa                 as R
 
 import Data.Array.Accelerate.IO
+import Data.Array.Accelerate (Acc)
 import qualified Data.Array.Accelerate           as A
 
 
@@ -48,13 +50,18 @@ type MargPos = Int
 -- | Coordinates in a Gloss window, origin at center
 type GlossCoord = (Float, Float)
 
+-- | Gravity mask
+type family GravMask arr
+type instance GravMask A = Acc (Matrix MargPos)
+type instance GravMask U = Array U DIM2 MargPos
+
 data World r = World { array        :: Array r DIM2 Cell
                      , currentElem  :: Element
                      , mouseDown    :: Bool
                      , mousePos     :: GlossCoord
                      , mousePrevPos :: GlossCoord
-                     , currGravityMask :: Array U DIM2 MargPos
-                     , nextGravityMask :: Array U DIM2 MargPos
+                     , currGravityMask :: GravMask r
+                     , nextGravityMask :: GravMask r
                      , tooltipLeft     :: Array V DIM2 Color
                      , tooltipRight    :: Array V DIM2 Color }
 
