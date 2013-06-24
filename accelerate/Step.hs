@@ -24,7 +24,7 @@ import Repa.Alchemy
 step :: Int -> Acc (Matrix MargPos) -> Acc (Matrix Cell) -> Acc (Matrix Cell)
 step gen mask array
   = let randomish = randomArray (uniformR (0, 100)) (Z :. resY :. resX)
-        envs = A.zip
+        envs = A.stencil2 R.Clamp array R.Clamp mask
 
         envs  = R.zipWith (\a (b,c) -> (alchemy a b, c)) randomish
               $ R.mapStencil2 (BoundFixed (nothing, 0)) margStencil
@@ -161,23 +161,23 @@ margMaskOdd = R.computeS $ R.map (flip subtract 3) margMaskEven
 --    and encode it as a number, combined with the Margolus position for each cell
 --
 {-# INLINE margStencil #-}
-margStencil :: Stencil DIM2 (Env, MargPos)
-margStencil = StencilStatic (Z :. 3 :. 3) (0, -1) mkBlock
-  where mkBlock :: DIM2 -> (Element, MargPos) -> (Env, MargPos) -> (Env, MargPos)
-        mkBlock (Z :.  1 :. -1) (n,0) (acc, p) = (acc .|. n, p)
-        mkBlock (Z :.  1 :.  0) (n,0) (acc, p) = (acc .|. n, p)
-        mkBlock (Z :.  0 :. -1) (n,0) (acc, p) = (acc .|. n, p)
-        mkBlock (Z :.  0 :.  0) (n,0) (acc, p) = (acc .|. n, 0)
-        mkBlock (Z :.  1 :.  0) (n,1) (acc, p) = (acc .|. shiftL n 8, p)
-        mkBlock (Z :.  1 :.  1) (n,1) (acc, p) = (acc .|. shiftL n 8, p)
-        mkBlock (Z :.  0 :.  0) (n,1) (acc, p) = (acc .|. shiftL n 8, 1)
-        mkBlock (Z :.  0 :.  1) (n,1) (acc, p) = (acc .|. shiftL n 8, p)
-        mkBlock (Z :.  0 :. -1) (n,2) (acc, p) = (acc .|. shiftL n 16, p)
-        mkBlock (Z :.  0 :.  0) (n,2) (acc, p) = (acc .|. shiftL n 16, 2)
-        mkBlock (Z :. -1 :. -1) (n,2) (acc, p) = (acc .|. shiftL n 16, p)
-        mkBlock (Z :. -1 :.  0) (n,2) (acc, p) = (acc .|. shiftL n 16, p)
-        mkBlock (Z :.  0 :.  0) (n,3) (acc, p) = (acc .|. shiftL n 24, 3)
-        mkBlock (Z :.  0 :.  1) (n,3) (acc, p) = (acc .|. shiftL n 24, p)
-        mkBlock (Z :. -1 :.  0) (n,3) (acc, p) = (acc .|. shiftL n 24, p)
-        mkBlock (Z :. -1 :.  1) (n,3) (acc, p) = (acc .|. shiftL n 24, p)
-        mkBlock _ _ acc = acc
+margStencil :: A.Stencil3x3 Cell -> Exp Cell
+margStencil ((_, (y0x1',2), (y1x1',0))
+            ,(_, (y0x0 ,3), (y1x0 ,1))
+            ,(_, _        , _       ))
+            = ((((y1x1' .|. shiftL n 8 y1x0) .|. shiftL n 16 y0x1') .|. shiftL n 32 y0x0), 3)
+
+margStencil ((_, _       , _      )
+            ,(_, (y0x0,2), (y1x0,0))
+            ,(_, (y0x1,3), (y1x1,1)))
+            = ((((y1x0 .|. shiftL n 8 y1x1) .|. shiftL n 16 y0x0) .|. shiftL n 32 y0x1), 2)
+
+margStencil ((_, (y0x1',0), (y1'x1',2))
+            ,(_, (y0x0 ,1), (y1'x0 ,3))
+            ,(_, _        , _        ))
+            = ((((y0x1' .|. shiftL n 8 y0x0) .|. shiftL n 16 y1'x1') .|. shiftL n 32 y1'x0), 1)
+
+margStencil ((_, _       , _        )
+            ,(_, (y0x0,0), (y1'x0,2))
+            ,(_, (y0x1,1), (y1'x1,3)))
+            = ((((y0x0 .|. shiftL n 8 y0x1) .|. shiftL n 16 y1'x0) .|. shiftL n 32 y1'x1), 0)
