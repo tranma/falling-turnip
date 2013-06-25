@@ -8,3 +8,5 @@ accelerate/Main
 repa/Main
 *.swp
 /Main
+
+.hs.swp

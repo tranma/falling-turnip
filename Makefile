@@ -5,7 +5,12 @@ GHC_OPTS := \
 	-O3 \
 	-Odph \
 	-rtsopts \
+	-fno-liberate-case \
+	-funfolding-use-threshold1000 \
+	-funfolding-keeness-factor1000 \
 	-fllvm \
+	-optlo-O3 \
+	-fsimpl-tick-factor=200
 
 GHC_WARNINGS	:= \
 	-Werror \
@@ -15,6 +20,7 @@ GHC_WARNINGS	:= \
 	-fwarn-missing-fields \
 	-fwarn-overlapping-patterns \
 	-fwarn-type-defaults \
+	-fwarn-unused-binds \
 	-fwarn-unused-imports \
 	-fno-warn-missing-methods
 

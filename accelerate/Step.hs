@@ -18,7 +18,7 @@ import Accelerate.Alchemy
 --import Accelerate.World
 import Random.Array
 
-{-# INLINE step #-}
+
 step :: Int -> Acc (Matrix MargPos) -> Acc (Matrix Cell) -> Acc (Matrix Cell)
 step gen mask array
   = let randomish = A.use $ randomArray (uniformR (0, 100)) (Z:.resY:.resX)
@@ -35,13 +35,13 @@ step gen mask array
 
 
 -- | Mask to extract cell at quadrant 'pos'
-{-# INLINE margQuadrant #-}
+
 margQuadrant :: Exp MargPos -> Exp Env -> Exp Cell
 margQuadrant pos = flip A.shiftR (8 * pos) . (.&. A.shiftL 0xff (8 * pos))
 
 
 -- | Break up the environment into its four components
-{-# INLINE split #-}
+
 split :: Exp Env -> (Exp Cell, Exp Cell, Exp Cell, Exp Cell)
 split env
  = let ul = (env .&. eight1)
@@ -57,12 +57,12 @@ split env
 
 -- | Combine the lighter/heavier state of all 4 cells into an env
 --     32bits: | DR | DL | UR | UL |
-{-# INLINE combine #-}
+
 combine :: (Exp Cell, Exp Cell, Exp Cell, Exp Cell) -> Exp Env
 combine (ul, ur, dl, dr)
  = ul .|. (A.shiftL ur 8) .|. (A.shiftL dl 16) .|. (A.shiftL dr 24)
 
-{-# INLINE combine' #-}
+
 combine' :: (Exp Weight, Exp Weight, Exp Weight, Exp Weight) -> Exp WeightEnv
 combine' (ul, ur, dl, dr)
  = ul .|. (A.shiftL ur 2) .|. (A.shiftL dl 4) .|. (A.shiftL dr 6)
@@ -70,7 +70,7 @@ combine' (ul, ur, dl, dr)
 
 -- | Apply gravity to the cell at quadrant 'pos' in 'env'
 --      returning the quadrant it should swap with
-{-# INLINE weigh #-}
+
 weigh :: Exp (Env, MargPos) -> Exp MargPos
 weigh (A.unlift -> (env, pos))
   = let current              = margQuadrant pos env
@@ -134,7 +134,7 @@ weigh (A.unlift -> (env, pos))
                                                        , x))))
 
 -- | Perform alchemy on a margolus block, with randomised probability of succeeding
-{-# INLINE alchemy #-}
+
 alchemy :: Exp Int -> Exp Env -> Exp Env
 alchemy i env
  = let (ul0, ur0, dl0, dr0) = split env
@@ -154,13 +154,13 @@ alchemy i env
 --   0 1 0 1 ....
 --   2 3 2 3 ....
 --   ...
-{-# INLINE margMaskEven #-}
+
 margMaskEven :: Acc (Matrix MargPos)
 margMaskEven
   = A.generate res
           $ \ix -> let (Z:.y:.x) = A.unlift ix in x `mod` 2 .|. shiftL (y `mod` 2) 1
 
-{-# INLINE margMaskOdd #-}
+
 margMaskOdd :: Acc (Matrix MargPos)
 margMaskOdd
   = A.map (flip subtract 3) margMaskEven
@@ -168,7 +168,7 @@ margMaskOdd
 -- | Given a Moore neighbourhood (3x3), find the Margolus neighbourhood (2x2)
 --    and encode it as a number, combined with the Margolus position for each cell
 --
-{-# INLINE margStencil #-}
+
 margStencil :: A.Stencil3x3 (Cell, MargPos) -> Exp (Cell, MargPos)
 margStencil ((y0x0,y0x1,y0x2)
             ,(y1x0,y1x1,y1x2)

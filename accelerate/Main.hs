@@ -38,7 +38,7 @@ main = do
     ( return    . render)
     ((return .) . handleInput)
     (stepWorld tooltips)
-  where frameRate = 30
+  where frameRate = 10
         pos       = 300
         bareWorld = const nothing
 
