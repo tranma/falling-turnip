@@ -31,7 +31,7 @@ isFluid x = (x ==* 1 ||* x ==* 2 ||* x ==* 27 ||* (x >=* 6 &&* x <=* 8)) ? (2, 0
 
 {-# INLINE weight #-}
 weight :: Exp Element -> Exp Weight
-weight x = (x ==* 1 ||* x ==* 2) ? (0, (x ==* 0 ? (2, (x ==* 9) ? (lift' $ fromIntegral salt, (x ==* 27) ? (lift' $ fromIntegral water, isFire x ? (0, lift' $ fromIntegral x))))))
+weight x = (x ==* 1 ||* x ==* 2) ? (0, (x ==* 0 ? (2, (x ==* 9) ? (lift' $ fromIntegral salt, (x ==* 27) ? (lift' $ fromIntegral water, isFire x ? (0, A.fromIntegral x))))))
   where lift' :: Weight -> Exp Weight
         lift' = lift
 
