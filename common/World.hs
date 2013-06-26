@@ -10,7 +10,7 @@ module Common.World
        , water, salt_water, sand, salt, stone, torch, plant, spout, metal, wall, lava
 
        , isFluid, isWall, isFire
-       , weight, age
+       , weight, age, age'
 
        , MargPos (..)
        , GlossCoord (..), World (..), WorldA, WorldR
@@ -88,8 +88,8 @@ plant           = 24
 spout           = 25
 metal           = 26
 lava            = 27
-turnip          = 126
-wall            = 127
+turnip          = 28
+wall            = 29
 
 {-# INLINE elems #-}
 elems :: [Element]
@@ -117,7 +117,7 @@ isWall 23  = True     -- torch
 isWall 24  = True     -- plant
 isWall 25  = True     -- spout
 isWall 26  = True     -- metal
-isWall 127 = True     -- wall
+isWall 29  = True     -- wall
 isWall _   = False
 
 {-# INLINE isFire #-}
@@ -158,6 +158,18 @@ age r x
   | x == turnip   = elems !! ((r * length elems) `div` 110)
   | otherwise     = x
 
+{-# INLINE age' #-}
+age' :: Element -> (Int, Element, Element)
+age' x
+  -- fire eventually goes out
+  | x == fire_end = (0, nothing, nothing)
+  | isFire x      = (50, x + 1, x)
+  -- steam eventually condenses
+  | x == steam_water     = (1, water, steam_water)
+  | x == steam_condensed = (5, water, steam_condensed)
+  -- turnip being turnip
+  | x == turnip   = (50, water, fire) -- FIXME
+  | otherwise     = (0,x,x)
 
 -- Drawing ---------------------------------------------------------------------
 {-# INLINE render #-}
@@ -188,8 +200,8 @@ colour 24  = dim $ green                             -- plant
 colour 25  = blue                                    -- spout
 colour 26  = mixColors (0.2) (0.8) blue (greyN 0.5)  -- metal
 colour 27  = bright red                              -- lava
-colour 126 = violet                                  -- turnip
-colour 127 = greyN 0.4                               -- wall
+colour 28  = violet                                  -- turnip
+colour 29  = greyN 0.4                               -- wall
 colour x                                             -- fire
   | isFire x  = mixColors (1.0 * fromIntegral (x - fire))
                           (1.0 * fromIntegral (fire_end - x))

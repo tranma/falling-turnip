@@ -5,17 +5,16 @@ module Accelerate.World
        , module Common.World)
 where
 
-import Data.Array.Accelerate (Acc, Array, Exp, DIM1, Z(..), (:.)(..), (?), lift, (>=*), (<=*), (<*), (&&*), (||*), (==*))
+import Data.Array.Accelerate (Acc, Array, Exp, DIM1, Z(..), (:.)(..), (?), (>=*), (<=*), (<*), (&&*), (||*), (==*))
 import qualified Data.Array.Accelerate as A
 
 import Common.World hiding (isFluid, isWall, isFire, weight, age)
+import qualified Common.World as C
+import Data.Word
 
 res = A.index2 (A.lift resY) (A.lift resX)
 
 -- Elements and properties -----------------------------------------------------
-
-elemsAcc :: Acc (Array DIM1 Element)
-elemsAcc = A.use $ A.fromList (Z:.(length elems)) elems
 
 {-# INLINE isWall #-}
 isWall :: Exp Element -> Exp Bool
@@ -25,16 +24,25 @@ isWall x = (x >=* 23 &&* x <=* 26) ||* x ==* 127
 isFire :: Exp Element -> Exp Bool
 isFire x = x >=* A.lift fire &&* x <=* A.lift fire_end
 
-{-# INLINE isFluid #-}
+fluidArray :: Acc (Array DIM1 Word8)
+fluidArray = A.use $ A.fromList (Z:. fromIntegral wall + 1) $ map C.isFluid [0..wall]
+
 isFluid :: Exp Element -> Exp Weight
-isFluid x = (x ==* 1 ||* x ==* 2 ||* x ==* 27 ||* (x >=* 6 &&* x <=* 8)) ? (2, 0)
+isFluid x = fluidArray A.!! A.fromIntegral x 
+
+
+weightArray :: Acc (Array DIM1 Weight)
+weightArray = A.use $ A.fromList (Z:. fromIntegral wall + 1) $ map C.weight [0..wall]
 
 {-# INLINE weight #-}
 weight :: Exp Element -> Exp Weight
-weight x = (x ==* 1 ||* x ==* 2) ? (0, (x ==* 0 ? (2, (x ==* 9) ? (lift' $ fromIntegral salt, (x ==* 27) ? (lift' $ fromIntegral water, isFire x ? (0, A.fromIntegral x))))))
-  where lift' :: Weight -> Exp Weight
-        lift' = lift
+weight x = weightArray A.!! A.fromIntegral x 
+
+
+ageArray :: Acc (Array DIM1 (Int, Element, Element))
+ageArray = A.use $ A.fromList (Z :. fromIntegral wall + 1) $ map age' [0..wall]
 
 {-# INLINE age #-}
 age :: Exp Int -> Exp Element -> Exp Element
-age r x = x ==* (lift fire_end) ? (lift nothing, isFire x ? (r <* 50 ? (x+1,x), x ==* (lift steam_water) ? (r <* 1 ? (lift water, lift steam_water), x ==* (lift steam_condensed) ? (r <* 5 ? (lift water, lift steam_condensed), x ==* (lift turnip) ? (elemsAcc A.! (A.index1 ((r * (lift $ length elems)) `div` 110)), x)))))
+age r x = let (i,t,e) = A.unlift $ ageArray A.!! A.fromIntegral x 
+           in (r <* i) ? (t,e)

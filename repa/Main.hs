@@ -19,7 +19,7 @@ import Repa.Step
 import Common.Draw
 import Common.World
 import Common.Event
-
+   
 main :: IO ()
 main = do
   tooltips <- mapM loadTooltip tooltipFiles

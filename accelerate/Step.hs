@@ -18,6 +18,7 @@ import Accelerate.Alchemy
 --import Accelerate.World
 import Random.Array
 
+type Env4 = (Cell, Cell, Cell, Cell)
 
 step :: Int -> Acc (Matrix MargPos) -> Acc (Matrix Cell) -> Acc (Matrix Cell)
 step gen mask array
@@ -30,18 +31,21 @@ step gen mask array
       $ A.map weigh envs
     where -- Swap cell at position 'p' in the margolus block 'env' with
           --    the cell at 'pos' in the same block
-          mkCell :: Exp (Env, MargPos) -> Exp MargPos -> Exp Cell
+          mkCell :: Exp (Env4, MargPos) -> Exp MargPos -> Exp Cell
           mkCell x pos = margQuadrant pos $ A.fst x
 
 
 -- | Mask to extract cell at quadrant 'pos'
 
-margQuadrant :: Exp MargPos -> Exp Env -> Exp Cell
-margQuadrant pos = flip A.shiftR (8 * pos) . (.&. A.shiftL 0xff (8 * pos))
+margQuadrant :: Exp MargPos -> Exp (Cell, Cell, Cell, Cell) -> Exp Cell
+margQuadrant p (A.unlift -> (x0,x1,x2,x3)) = (p ==* 0) ? (x0
+                                           , (p ==* 1) ? (x1
+                                           , (p ==* 2) ? (x2
+                                           , x3)))
 
 
 -- | Break up the environment into its four components
-
+{-
 split :: Exp Env -> (Exp Cell, Exp Cell, Exp Cell, Exp Cell)
 split env
  = let ul = (env .&. eight1)
@@ -54,7 +58,7 @@ split env
           eight2 = A.shiftL eight1 8
           eight3 = A.shiftL eight2 8
           eight4 = A.shiftL eight3 8
-
+-}
 -- | Combine the lighter/heavier state of all 4 cells into an env
 --     32bits: | DR | DL | UR | UL |
 
@@ -71,10 +75,10 @@ combine' (ul, ur, dl, dr)
 -- | Apply gravity to the cell at quadrant 'pos' in 'env'
 --      returning the quadrant it should swap with
 
-weigh :: Exp (Env, MargPos) -> Exp MargPos
+weigh :: Exp (Env4, MargPos) -> Exp MargPos
 weigh (A.unlift -> (env, pos))
   = let current              = margQuadrant pos env
-        (ul', ur', dl', dr') = split env
+        (ul', ur', dl', dr') = A.unlift env
 
         -- The heaviest item in the environment
         heaviest = A.max (A.max (weight ul') (weight ur'))
@@ -90,7 +94,7 @@ weigh (A.unlift -> (env, pos))
         weighed1 = combine' (ul, ur, dl, dr)
 
         -- Apply gravity with respect to the heaviest
-        x' =  applyGravity weighed1 pos -- .|. shiftL 1 (8 * pos))
+        x' =  applyGravity weighed1 pos
 
         x  = isWall (margQuadrant x' env) ? (pos, x')
 
@@ -135,18 +139,20 @@ weigh (A.unlift -> (env, pos))
 
 -- | Perform alchemy on a margolus block, with randomised probability of succeeding
 
-alchemy :: Exp Int -> Exp Env -> Exp Env
+alchemy :: Exp Int -> Exp Env4 -> Exp Env4
 alchemy i env
- = let (ul0, ur0, dl0, dr0) = split env
+ = let (ul0, ur0, dl0, dr0) = A.unlift env
        -- Apply interaction among the components
-       (ul1, ur1) = A.unlift $ applyAlchemy i ul0 ur0
-       (ur , dr2) = A.unlift $ applyAlchemy i ur1 dr0
-       (dr , dl3) = A.unlift $ applyAlchemy i dr2 dl0
-       (dl , ul ) = A.unlift $ applyAlchemy i dl3 ul1
+       (ul1, ur1) = unlift' $ applyAlchemy i ul0 ur0
+       (ur , dr2) = unlift' $ applyAlchemy i ur1 dr0
+       (dr , dl3) = unlift' $ applyAlchemy i dr2 dl0
+       (dl , ul ) = unlift' $ applyAlchemy i dl3 ul1
    in  (ul0 ==* ur0 &&* ur0 ==* dl0 &&* dl0 ==* dr0)
        ? ( env
-         , combine (ul, ur, dl, dr)
+         , A.lift (ul, ur, dl, dr)
          )
+ where unlift' :: Exp (Cell, Cell) -> (Exp Cell, Exp Cell)
+       unlift' = A.unlift
 
 -- Margolus block --------------------------------------------------------------
 
@@ -169,15 +175,15 @@ margMaskOdd
 --    and encode it as a number, combined with the Margolus position for each cell
 --
 
-margStencil :: A.Stencil3x3 (Cell, MargPos) -> Exp (Cell, MargPos)
+margStencil :: A.Stencil3x3 (Cell, MargPos) -> Exp ((Cell, Cell, Cell, Cell), MargPos)
 margStencil ((y0x0,y0x1,y0x2)
             ,(y1x0,y1x1,y1x2)
             ,(y2x0,y2x1,y2x2))
             = A.lift $ flip (,) (A.snd y1x1) $
-            ( (A.snd y1x1 A.==* 0) A.? (combine (A.fst y1x1, A.fst y1x2, A.fst y2x1, A.fst y2x2)
-            , (A.snd y1x1 A.==* 1) A.? (combine (A.fst y1x0, A.fst y1x1, A.fst y2x0, A.fst y2x1)
-            , (A.snd y1x1 A.==* 2) A.? (combine (A.fst y0x1, A.fst y0x2, A.fst y1x1, A.fst y1x2)
-            ,                          (combine (A.fst y0x0, A.fst y0x1, A.fst y1x0, A.fst y1x1))))))
+            ( (A.snd y1x1 A.==* 0) A.? (A.lift (A.fst y1x1, A.fst y1x2, A.fst y2x1, A.fst y2x2)
+            , (A.snd y1x1 A.==* 1) A.? (A.lift (A.fst y1x0, A.fst y1x1, A.fst y2x0, A.fst y2x1)
+            , (A.snd y1x1 A.==* 2) A.? (A.lift (A.fst y0x1, A.fst y0x2, A.fst y1x1, A.fst y1x2)
+            ,                          (A.lift (A.fst y0x0, A.fst y0x1, A.fst y1x0, A.fst y1x1))))))
 
 
 

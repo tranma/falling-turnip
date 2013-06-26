@@ -1,6 +1,7 @@
 {-# LANGUAGE QuasiQuotes, ViewPatterns #-}
 module Repa.Gravity
-      (applyGravity)
+      (applyGravity
+      ,applyGravity')
 where
 
 import Data.Bits
